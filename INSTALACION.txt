@@ -1,0 +1,218 @@
+# 🚀 GUÍA DE INSTALACIÓN — Mundo Kositas PWA
+# Módulo 1: Firebase + Login + Estructura Base
+
+=======================================================
+## PASO 1 — Crear cuenta en Firebase (GRATIS)
+=======================================================
+
+1. Abre en tu computadora:  https://console.firebase.google.com
+2. Inicia sesión con una cuenta de Google (Gmail)
+3. Clic en "Crear un proyecto"
+4. Nombre del proyecto:  mundo-kositas
+5. Desactiva Google Analytics (no es necesario)
+6. Clic en "Crear proyecto"
+7. Espera que se cree (1 minuto aprox.)
+
+
+=======================================================
+## PASO 2 — Activar Authentication (Login)
+=======================================================
+
+1. En el menú izquierdo clic en "Authentication"
+2. Clic en "Comenzar"
+3. En la pestaña "Método de acceso" clic en "Correo/Contraseña"
+4. Activa la primera opción (Correo/Contraseña)
+5. Guardar
+
+6. Ir a la pestaña "Usuarios"
+7. Clic en "Agregar usuario"
+8. Escribe TU correo y una contraseña (mínimo 8 caracteres)
+9. Clic en "Agregar usuario"
+   ✅ Este será tu acceso de administrador
+
+
+
+=======================================================
+## PASO 2B — Activar Autenticación Anónima (REPARTIDORES)
+=======================================================
+Este paso es NECESARIO para que el link mágico del
+repartidor funcione sin pedir usuario y contraseña.
+
+1. En Firebase ir a Authentication
+2. Pestaña "Método de acceso"
+3. Buscar "Anónimo" en la lista
+4. Activarlo
+5. Guardar
+
+Sin este paso el repartidor verá pantalla de login
+en lugar de ver sus pedidos.
+
+=======================================================
+## PASO 3 — Activar Firestore (Base de Datos)
+=======================================================
+
+1. En el menú izquierdo clic en "Firestore Database"
+2. Clic en "Crear base de datos"
+3. Selecciona "Iniciar en modo de prueba"
+   (cambiaremos las reglas después)
+4. Selecciona ubicación: us-central1
+5. Clic en "Habilitar"
+6. Espera que se cree (1-2 minutos)
+
+
+=======================================================
+## PASO 4 — Obtener tu configuración Firebase
+=======================================================
+
+1. En el menú izquierdo clic en el ícono ⚙️ (Configuración del proyecto)
+2. Baja hasta "Tus aplicaciones"
+3. Clic en el ícono </> (Web)
+4. Nombre de la app:  mundo-kositas-web
+5. NO actives Firebase Hosting por ahora
+6. Clic en "Registrar app"
+7. Verás un bloque de código con tus datos:
+
+   const firebaseConfig = {
+     apiKey: "AIza...",
+     authDomain: "mundo-kositas.firebaseapp.com",
+     projectId: "mundo-kositas",
+     storageBucket: "mundo-kositas.appspot.com",
+     messagingSenderId: "123456789",
+     appId: "1:123456789:web:abc123"
+   };
+
+8. COPIA ESTOS 6 VALORES (los necesitas en el siguiente paso)
+
+
+=======================================================
+## PASO 5 — Pegar tu configuración en index.html
+=======================================================
+
+1. Abre el archivo  index.html  con un editor de texto
+   (Puedes usar el Bloc de notas, o mejor aún Notepad++)
+
+2. Busca este bloque (cerca de la línea 480):
+
+   const firebaseConfig = {
+     apiKey:            "REEMPLAZA_API_KEY",
+     authDomain:        "REEMPLAZA.firebaseapp.com",
+     projectId:         "REEMPLAZA_PROJECT_ID",
+     storageBucket:     "REEMPLAZA.appspot.com",
+     messagingSenderId: "REEMPLAZA_SENDER_ID",
+     appId:             "REEMPLAZA_APP_ID"
+   };
+
+3. Reemplaza CADA valor con los de tu proyecto Firebase
+4. Guarda el archivo
+
+
+=======================================================
+## PASO 6 — Publicar la app (GRATIS con Netlify)
+=======================================================
+
+Opción más fácil — Netlify Drop:
+
+1. Abre en tu computadora:  https://netlify.com
+2. Crea una cuenta gratis (con tu Gmail)
+3. En la página principal verás "Sites"
+4. Busca el recuadro que dice:
+   "Drag and drop your site folder here"
+5. Arrastra la CARPETA completa  mundokositas  a ese recuadro
+6. Netlify publica la app en segundos
+7. Te dará una URL como:
+   https://amazing-name-123456.netlify.app
+
+8. ¡Esa URL es tu app! Ábrela en tu celular
+9. En tu celular: toca el menú del navegador → "Agregar a pantalla de inicio"
+   Así se instala como app 📱
+
+
+=======================================================
+## PASO 7 — Reglas de seguridad Firebase
+=======================================================
+
+IMPORTANTE: Antes de compartir con el repartidor,
+actualiza las reglas en Firestore:
+
+1. En Firebase, ir a Firestore Database
+2. Pestaña "Reglas"
+3. Reemplaza todo el contenido con esto:
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Tokens: cualquier usuario autenticado (incluye anónimos)
+    // puede leer y actualizar su token
+    match /tokens/{tokenId} {
+      allow read, update: if request.auth != null;
+      allow create: if request.auth != null;
+    }
+
+    // Todo lo demás: solo usuarios autenticados
+    match /{document=**} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}
+
+4. Clic en "Publicar"
+
+
+=======================================================
+## LO QUE FUNCIONA EN MÓDULO 1
+=======================================================
+
+✅ Login con correo y contraseña (administrador)
+✅ Dashboard con estadísticas del día
+✅ Crear pedidos manualmente (captura desde WhatsApp)
+✅ Ver detalle de cada pedido
+✅ Aceptar / Cancelar pedidos
+✅ Asignar repartidor con mensaje WhatsApp automático
+✅ Marcar pedido como entregado
+✅ Alta, edición de repartidores
+✅ Generar link mágico para repartidor por WhatsApp
+✅ Vista del repartidor (sus pedidos asignados)
+✅ Marcar entregado desde vista repartidor
+✅ Botón para abrir Google Maps
+✅ Alta y edición de productos en catálogo
+✅ Ocultar/mostrar productos
+✅ Vista de clientes
+✅ Botones WhatsApp en pedidos (aceptado, entregado)
+✅ Filtros por estado de pedido
+✅ Datos en tiempo real entre dispositivos
+✅ Se instala como app en Android e iPhone
+
+🔜 PRÓXIMOS MÓDULOS:
+   M2: Catálogo con variantes + carrito del cliente
+   M3: Zonas y costo de envío automático
+   M4: Formulario cliente desde WhatsApp (link)
+   M5: Corte del repartidor
+   M6: Reportes
+
+
+=======================================================
+## ESTRUCTURA DE ARCHIVOS
+=======================================================
+
+mundokositas/
+├── index.html      ← App principal (TODO en un archivo)
+├── manifest.json   ← Configuración PWA
+├── sw.js           ← Service Worker (modo offline)
+├── icon-192.png    ← Ícono de la app (192x192 px) *
+├── icon-512.png    ← Ícono de la app (512x512 px) *
+└── INSTALACION.txt ← Este archivo
+
+* Los íconos los puedes crear en:
+  https://favicon.io/favicon-generator/
+  Usa texto "MK" con fondo rojo (#C0392B)
+
+
+=======================================================
+## SOPORTE
+=======================================================
+
+Si algo no funciona, captura el error exacto que ves
+en pantalla y compártelo para ayudarte.
+
+¡Éxito con Mundo Kositas! 🏠🚴📦

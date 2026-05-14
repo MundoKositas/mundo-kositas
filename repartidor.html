@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#8E24AA">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="MK Repartidor">
+<title>Mis Pedidos — Mundo Kositas</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root {
+  --morado:#8E24AA; --morado-dark:#6A1B9A; --morado-light:#F3E5F5;
+  --verde:#27AE60;  --verde-light:#D5F5E3;
+  --azul:#2980B9;   --azul-light:#D6EAF8;
+  --naranja:#E67E22; --amarillo:#F39C12;
+  --rojo:#C0392B;   --rojo-light:#FADBD8;
+  --gris-dark:#2C3E50; --gris:#7F8C8D; --gris-light:#ECF0F1;
+  --blanco:#FFFFFF; --bg:#F4F4F4; --border:#DDD;
+  --shadow:0 2px 12px rgba(0,0,0,0.07);
+  --shadow-lg:0 8px 32px rgba(0,0,0,0.13);
+  --radius:14px; --radius-sm:10px;
+  --font:'Nunito',sans-serif;
+  --header-h:58px; --nav-h:62px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;}
+body{font-family:var(--font);background:var(--bg);color:var(--gris-dark);
+  -webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent;}
+button{cursor:pointer;font-family:var(--font);}
+
+/* PANTALLA DE CARGA */
+#cargando{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  min-height:100vh;gap:1rem;
+  background:linear-gradient(160deg,#4A148C 0%,var(--morado) 100%);
+  color:white;
+}
+.spin{width:44px;height:44px;border:4px solid rgba(255,255,255,0.3);
+  border-top-color:white;border-radius:50%;animation:spin 0.8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.carga-msg{font-size:0.9rem;font-weight:700;opacity:0.9;}
+
+/* ERROR */
+#pantallaError{
+  display:none;flex-direction:column;align-items:center;justify-content:center;
+  min-height:100vh;padding:2rem;text-align:center;
+  background:linear-gradient(160deg,#4A148C 0%,var(--morado) 100%);
+}
+.error-card{background:white;border-radius:20px;padding:2rem 1.5rem;
+  max-width:340px;width:100%;box-shadow:var(--shadow-lg);}
+.error-icon{font-size:3.5rem;margin-bottom:0.75rem;}
+.error-titulo{font-size:1.1rem;font-weight:900;margin-bottom:0.5rem;color:var(--gris-dark);}
+.error-desc{font-size:0.85rem;color:var(--gris);font-weight:600;line-height:1.5;}
+
+/* APP */
+#appRep{display:none;height:100vh;overflow:hidden;flex-direction:column;}
+#appRep.visible{display:flex;}
+
+/* HEADER */
+.header{background:var(--morado);color:white;height:var(--header-h);
+  padding:0 1.25rem;display:flex;align-items:center;justify-content:space-between;
+  flex-shrink:0;box-shadow:0 2px 10px rgba(106,27,154,0.35);}
+.header-left h2{font-size:1rem;font-weight:900;}
+.header-left small{font-size:0.7rem;opacity:0.8;}
+.header-badge{background:rgba(255,255,255,0.2);border-radius:8px;
+  padding:0.3rem 0.65rem;font-size:0.75rem;font-weight:800;}
+
+/* CONTENT */
+.content{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:1rem;}
+
+/* AVISO FUTUROS */
+.aviso-futuros{background:#FEF9E7;border-left:4px solid var(--amarillo);
+  border-radius:var(--radius-sm);padding:0.65rem 0.9rem;margin-bottom:0.75rem;
+  font-size:0.8rem;font-weight:700;color:#7D6608;display:none;}
+
+/* PEDIDO CARD */
+.pedido-card{background:white;border-radius:var(--radius);padding:1rem;
+  margin-bottom:0.75rem;box-shadow:var(--shadow);border-left:4px solid var(--amarillo);}
+.pc-dir{font-weight:800;font-size:0.95rem;margin-bottom:0.2rem;}
+.pc-col{font-size:0.8rem;color:var(--gris);font-weight:600;margin-bottom:0.3rem;}
+.pc-prod{font-size:0.82rem;font-weight:700;color:var(--gris-dark);margin-bottom:0.2rem;}
+.pc-nombre{font-size:0.78rem;color:var(--gris);font-weight:600;}
+.pc-hora{font-size:0.78rem;color:var(--gris);font-weight:600;}
+.pc-notas{font-size:0.78rem;color:var(--gris-dark);font-weight:600;
+  background:var(--gris-light);border-radius:6px;padding:0.35rem 0.6rem;margin-top:0.35rem;}
+.pc-bottom{display:flex;justify-content:space-between;align-items:center;
+  margin-top:0.6rem;}
+.pc-total{font-size:1.25rem;font-weight:900;color:var(--morado);}
+.pc-pago{font-size:0.75rem;color:var(--gris);font-weight:700;}
+.pc-acciones{display:flex;gap:0.5rem;flex-wrap:wrap;margin-top:0.75rem;}
+
+/* BOTONES */
+.btn-sm{display:inline-flex;align-items:center;gap:0.3rem;padding:0.5rem 0.9rem;
+  border:none;border-radius:999px;font-size:0.8rem;font-weight:700;cursor:pointer;
+  font-family:var(--font);transition:transform 0.15s;text-decoration:none;}
+.btn-sm:active{transform:scale(0.94);}
+.btn-verde{background:var(--verde);color:white;}
+.btn-rojo{background:var(--rojo);color:white;}
+.btn-azul{background:var(--azul);color:white;}
+
+/* ORDEN RUTA */
+.btn-orden{width:28px;height:28px;border-radius:6px;border:1px solid var(--border);
+  background:var(--gris-light);font-weight:900;cursor:pointer;font-size:0.85rem;
+  display:inline-flex;align-items:center;justify-content:center;}
+
+/* EMPTY */
+.empty{text-align:center;padding:3rem 1rem;color:var(--gris);}
+.empty-icon{font-size:3rem;margin-bottom:0.75rem;}
+.empty-text{font-size:0.9rem;font-weight:700;}
+
+/* MODAL */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);
+  z-index:200;align-items:flex-end;justify-content:center;}
+.modal-overlay.open{display:flex;}
+.modal-sheet{background:white;border-radius:22px 22px 0 0;padding:1.5rem 1.25rem 2rem;
+  width:100%;max-width:540px;max-height:90vh;overflow-y:auto;}
+.modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;}
+.modal-title{font-size:1.05rem;font-weight:900;}
+.modal-close{background:var(--gris-light);border:none;width:32px;height:32px;
+  border-radius:50%;font-size:1.1rem;display:flex;align-items:center;
+  justify-content:center;cursor:pointer;color:var(--gris);}
+
+/* MOTIVOS */
+.motivo-opt{display:flex;align-items:center;gap:0.75rem;padding:0.75rem;
+  background:var(--gris-light);border-radius:var(--radius-sm);cursor:pointer;
+  font-weight:700;font-size:0.88rem;margin-bottom:0.5rem;}
+.form-control{width:100%;padding:0.8rem 1rem;border:2px solid var(--border);
+  border-radius:var(--radius-sm);font-size:0.9rem;font-weight:600;
+  font-family:var(--font);outline:none;}
+.form-control:focus{border-color:var(--morado);}
+.btn-full{display:block;width:100%;padding:0.9rem;border:none;border-radius:var(--radius-sm);
+  font-size:1rem;font-weight:800;font-family:var(--font);cursor:pointer;
+  background:var(--rojo);color:white;margin-top:1rem;}
+
+/* CORTE */
+.corte-card{background:white;border-radius:var(--radius);padding:1rem;
+  box-shadow:var(--shadow);margin-bottom:0.75rem;}
+.corte-titulo{font-size:0.7rem;font-weight:800;color:var(--gris);
+  text-transform:uppercase;letter-spacing:0.06em;margin-bottom:0.5rem;}
+.corte-total{font-size:1.8rem;font-weight:900;color:var(--morado);}
+.corte-row{display:flex;justify-content:space-between;font-size:0.85rem;
+  font-weight:700;padding:0.35rem 0;border-bottom:1px solid var(--gris-light);}
+.corte-row:last-child{border-bottom:none;}
+
+/* NAV */
+.bottom-nav{background:white;border-top:1px solid var(--border);display:flex;
+  height:var(--nav-h);flex-shrink:0;z-index:80;
+  padding-bottom:env(safe-area-inset-bottom,0);}
+.nav-btn{flex:1;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:0.15rem;border:none;background:none;
+  color:#AAA;font-size:0.6rem;font-weight:700;font-family:var(--font);
+  text-transform:uppercase;letter-spacing:0.05em;cursor:pointer;}
+.nav-btn.active{color:var(--morado);}
+.nav-icon{font-size:1.45rem;line-height:1;}
+
+/* LOADING INLINE */
+.loading{text-align:center;padding:2rem;color:var(--gris);font-weight:600;}
+</style>
+</head>
+<body>
+
+<!-- CARGANDO -->
+<div id="cargando">
+  <div class="spin"></div>
+  <div class="carga-msg" id="cargaMsg">Verificando acceso…</div>
+</div>
+
+<!-- ERROR -->
+<div id="pantallaError">
+  <div class="error-card">
+    <div class="error-icon">⚠️</div>
+    <div class="error-titulo" id="errorTitulo">Link no válido</div>
+    <div class="error-desc" id="errorDesc">
+      Este link expiró o no es válido.<br>Pide uno nuevo al administrador.
+    </div>
+  </div>
+</div>
+
+<!-- APP REPARTIDOR -->
+<div id="appRep">
+  <header class="header">
+    <div class="header-left">
+      <h2 id="repNombre">Mis Pedidos</h2>
+      <small id="repFecha"></small>
+    </div>
+    <span class="header-badge" id="repContador">0 pedidos</span>
+  </header>
+
+  <div class="content" id="appContent">
+
+    <!-- PEDIDOS -->
+    <div id="pagPedidos">
+      <div class="aviso-futuros" id="avisoPedidosFuturos"></div>
+      <div id="listaMisPedidos"><div class="loading">Cargando pedidos…</div></div>
+    </div>
+
+    <!-- CORTE -->
+    <div id="pagCorte" style="display:none;">
+      <div id="corteContenido"><div class="loading">Cargando…</div></div>
+    </div>
+
+  </div>
+
+  <nav class="bottom-nav">
+    <button class="nav-btn active" id="navPed" onclick="mostrarPag('pedidos')">
+      <span class="nav-icon">📋</span><span>Mis Pedidos</span>
+    </button>
+    <button class="nav-btn" id="navCor" onclick="mostrarPag('corte')">
+      <span class="nav-icon">💰</span><span>Mi Corte</span>
+    </button>
+  </nav>
+</div>
+
+<!-- MODAL NO ENTREGADO -->
+<div class="modal-overlay" id="modalNoEnt">
+  <div class="modal-sheet">
+    <div class="modal-header">
+      <span class="modal-title">⚠️ No se pudo entregar</span>
+      <button class="modal-close" onclick="cerrarModal()">✕</button>
+    </div>
+    <p style="font-size:0.85rem;color:var(--gris);font-weight:600;margin-bottom:0.75rem;">
+      Indica el motivo:
+    </p>
+    <input type="hidden" id="nePedidoId">
+    <label class="motivo-opt">
+      <input type="radio" name="neMotivo" value="Cliente no estaba en casa">
+      🏠 Cliente no estaba en casa
+    </label>
+    <label class="motivo-opt">
+      <input type="radio" name="neMotivo" value="Dirección incorrecta o no encontrada">
+      📍 Dirección incorrecta
+    </label>
+    <label class="motivo-opt">
+      <input type="radio" name="neMotivo" value="Cliente solicitó cancelar">
+      ❌ Cliente solicitó cancelar
+    </label>
+    <label class="motivo-opt">
+      <input type="radio" name="neMotivo" value="otro"
+             onchange="document.getElementById('neMotivoOtro').style.display='block'">
+      ✏️ Otro motivo
+    </label>
+    <input type="text" id="neMotivoOtro" class="form-control"
+           placeholder="Describe el motivo…" style="display:none;margin-top:0.5rem;">
+    <button class="btn-full" onclick="confirmarNoEntregado()">
+      ⚠️ Confirmar no entregado
+    </button>
+  </div>
+</div>
+
+<!-- FIREBASE -->
+<script type="module">
+import { initializeApp }    from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { getAuth, signInAnonymously, onAuthStateChanged }
+                            from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+import { getFirestore, collection, doc, getDoc, updateDoc, onSnapshot,
+         query, where, orderBy, serverTimestamp }
+                            from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+
+const firebaseConfig = {
+  apiKey:            "AIzaSyBxCcpMMZfsOVIgdYQgt1nPBrMAc64T6fE",
+  authDomain:        "mundo-kositas.firebaseapp.com",
+  projectId:         "mundo-kositas",
+  storageBucket:     "mundo-kositas.firebasestorage.app",
+  messagingSenderId: "374505927358",
+  appId:             "1:374505927358:web:8638ae949fd186a92ce4ef"
+};
+
+const app  = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db   = getFirestore(app);
+
+let repartidorId   = null;
+let repartidorNom  = null;
+let pedidosRep     = [];
+let rutaOrden      = [];
+let unsub          = null;
+
+// ============================================================
+// INICIO
+// ============================================================
+const token = new URLSearchParams(location.search).get('token');
+
+if(!token) {
+  mostrarError('Sin acceso', 'Este link no contiene un código de acceso válido.');
+} else {
+  setCargaMsg('Iniciando sesión…');
+  // Intentar login anónimo
+  signInAnonymously(auth).catch(e => {
+    mostrarError('Error de acceso', 'No se pudo iniciar sesión. Verifica tu conexión a internet.\n\nError: ' + e.message);
+  });
+}
+
+onAuthStateChanged(auth, async user => {
+  if(!user || !token) return;
+  setCargaMsg('Verificando link…');
+  await validarToken(token);
+});
+
+async function validarToken(tkn) {
+  try {
+    const snap = await getDoc(doc(db, 'tokens', tkn));
+
+    if(!snap.exists()) {
+      mostrarError('Link no válido', 'Este link no existe o ya fue eliminado.\nPide uno nuevo al administrador.');
+      return;
+    }
+
+    const td = snap.data();
+
+    if(td.expira && td.expira.toDate() < new Date()) {
+      mostrarError('Link expirado', 'Este link venció a medianoche.\nPide uno nuevo al administrador.');
+      return;
+    }
+
+    // Registrar último acceso
+    await updateDoc(doc(db,'tokens',tkn), { ultimoAcceso: serverTimestamp() });
+
+    repartidorId  = td.repartidorId;
+    repartidorNom = td.repartidorNombre || 'Repartidor';
+
+    iniciarApp();
+
+  } catch(e) {
+    console.error('Error validando token:', e);
+    mostrarError('Error de conexión',
+      'No se pudo verificar el link.\nVerifica tu internet e intenta de nuevo.\n\nDetalle: ' + e.message);
+  }
+}
+
+function iniciarApp() {
+  // Header
+  document.getElementById('repNombre').textContent  = repartidorNom;
+  document.getElementById('repFecha').textContent   =
+    new Date().toLocaleDateString('es-MX',{weekday:'long',day:'numeric',month:'long'});
+
+  // Mostrar app
+  document.getElementById('cargando').style.display = 'none';
+  document.getElementById('appRep').classList.add('visible');
+
+  // Suscribir pedidos
+  suscribirPedidos();
+}
+
+// ============================================================
+// PEDIDOS
+// ============================================================
+function suscribirPedidos() {
+  if(unsub) unsub();
+  const q = query(
+    collection(db,'pedidos'),
+    where('repartidorId','==',repartidorId),
+    where('estado','in',['asignado','aceptado'])
+  );
+  unsub = onSnapshot(q, snap => {
+    const todos = snap.docs.map(d=>({id:d.id,...d.data()}));
+    const hoy   = (()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');})();
+
+    // Solo hoy y atrasados
+    const visibles = todos.filter(p=>!p.fechaEntrega || p.fechaEntrega<=hoy);
+    const futuros  = todos.filter(p=>p.fechaEntrega && p.fechaEntrega>hoy);
+
+    // Ordenar por hora más próxima
+    visibles.sort((a,b)=>{
+      const fa = a.fechaEntrega ? new Date(a.fechaEntrega+'T'+(a.horaDesde||'23:59')) : null;
+      const fb = b.fechaEntrega ? new Date(b.fechaEntrega+'T'+(b.horaDesde||'23:59')) : null;
+      if(fa&&fb) return fa-fb;
+      if(fa) return -1; if(fb) return 1; return 0;
+    });
+
+    // Inicializar orden de ruta
+    if(rutaOrden.length !== visibles.length ||
+       !visibles.every(p=>rutaOrden.some(r=>r.id===p.id))) {
+      rutaOrden = [...visibles];
+    }
+
+    pedidosRep = visibles;
+    renderPedidos();
+
+    // Badge contador
+    document.getElementById('repContador').textContent =
+      pedidosRep.length + ' pedido' + (pedidosRep.length!==1?'s':'');
+
+    // Aviso futuros
+    const av = document.getElementById('avisoPedidosFuturos');
+    if(futuros.length) {
+      av.textContent = `📅 Tienes ${futuros.length} pedido(s) para días siguientes`;
+      av.style.display = 'block';
+    } else {
+      av.style.display = 'none';
+    }
+  });
+}
+
+function renderPedidos() {
+  const lista = document.getElementById('listaMisPedidos');
+
+  if(!rutaOrden.length) {
+    lista.innerHTML = `<div class="empty">
+      <div class="empty-icon">✅</div>
+      <div class="empty-text">Sin pedidos pendientes</div>
+    </div>`;
+    return;
+  }
+
+  lista.innerHTML = `<div style="font-size:0.72rem;color:var(--gris);font-weight:700;
+    margin-bottom:0.5rem;">↕️ Toca ↑ ↓ para ordenar tu ruta</div>` +
+  rutaOrden.map((p,idx) => {
+    const prodTexto = (p.items&&p.items.length)
+      ? p.items.map(it=>it.nombre+(it.cantidad>1?' x'+it.cantidad:'')).join(' · ')
+      : (p.producto||'—');
+    const mapsQ = p.lat&&p.lng
+      ? p.lat+','+p.lng
+      : encodeURIComponent((p.domicilio||'')+(p.colonia?' '+p.colonia:'')+' Durango');
+
+    return `<div class="pedido-card">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+        <div style="flex:1;min-width:0;">
+          <div class="pc-dir">📍 ${p.domicilio||'Sin dirección'}</div>
+          <div class="pc-col">${p.colonia||'—'}</div>
+          <div class="pc-prod">📦 ${prodTexto}</div>
+          ${p.nombre?`<div class="pc-nombre">👤 ${p.nombre}</div>`:''}
+          ${p.telefono?`<div class="pc-nombre">📱 ${p.telefono}</div>`:''}
+          ${p.horaDesde?`<div class="pc-hora">⏰ ${p.horaDesde} – ${p.horaHasta}</div>`:''}
+          ${p.notas?`<div class="pc-notas">📝 ${p.notas}</div>`:''}
+        </div>
+        <div style="display:flex;flex-direction:column;gap:0.25rem;margin-left:0.5rem;">
+          ${idx>0?`<button class="btn-orden" onclick="moverRuta(${idx},-1)">↑</button>`:'<div style="width:28px;"></div>'}
+          ${idx<rutaOrden.length-1?`<button class="btn-orden" onclick="moverRuta(${idx},1)">↓</button>`:'<div style="width:28px;"></div>'}
+        </div>
+      </div>
+      <div class="pc-bottom">
+        <div class="pc-total">$${(parseFloat(p.totalFinal)||0).toLocaleString('es-MX')}</div>
+        <div class="pc-pago">
+          ${p.metodoPago==='transferencia'?'🏦 Transferencia':'💵 Efectivo'}
+          ${p.feria?' · Cambio $'+p.feria:''}
+        </div>
+      </div>
+      <div class="pc-acciones">
+        <button class="btn-sm btn-verde" onclick="marcarEntregado('${p.id}')">✅ Entregado</button>
+        <button class="btn-sm btn-rojo"  onclick="abrirNoEntregado('${p.id}')">⚠️ No entregado</button>
+        <a href="https://maps.google.com/?q=${mapsQ}"
+           target="_blank" class="btn-sm btn-azul">🗺️ Mapa</a>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+window.moverRuta = (idx, dir) => {
+  const nuevo = idx+dir;
+  if(nuevo<0||nuevo>=rutaOrden.length) return;
+  [rutaOrden[idx],rutaOrden[nuevo]] = [rutaOrden[nuevo],rutaOrden[idx]];
+  renderPedidos();
+};
+
+// ============================================================
+// ACCIONES DEL PEDIDO
+// ============================================================
+window.marcarEntregado = async id => {
+  if(!confirm('¿Confirmas que el pedido fue entregado?')) return;
+  await updateDoc(doc(db,'pedidos',id), {
+    estado:'entregado',
+    fechaEntregaReal: serverTimestamp(),
+    'historialEstados.entregado': serverTimestamp()
+  });
+};
+
+window.abrirNoEntregado = id => {
+  document.getElementById('nePedidoId').value = id;
+  document.querySelectorAll('input[name="neMotivo"]').forEach(r=>r.checked=false);
+  document.getElementById('neMotivoOtro').style.display='none';
+  document.getElementById('neMotivoOtro').value='';
+  document.getElementById('modalNoEnt').classList.add('open');
+};
+
+window.confirmarNoEntregado = async () => {
+  const id      = document.getElementById('nePedidoId').value;
+  const checked = document.querySelector('input[name="neMotivo"]:checked');
+  if(!checked) { alert('Selecciona un motivo.'); return; }
+  const motivo = checked.value==='otro'
+    ? (document.getElementById('neMotivoOtro').value.trim()||'Otro')
+    : checked.value;
+  await updateDoc(doc(db,'pedidos',id), {
+    estado: 'noentregado',
+    motivoNoEntrega: motivo,
+    'historialEstados.noentregado': serverTimestamp()
+  });
+  cerrarModal();
+};
+
+window.cerrarModal = () => {
+  document.getElementById('modalNoEnt').classList.remove('open');
+};
+
+document.getElementById('modalNoEnt').addEventListener('click', e => {
+  if(e.target===document.getElementById('modalNoEnt')) cerrarModal();
+});
+
+// ============================================================
+// CORTE DEL DÍA
+// ============================================================
+function renderCorte() {
+  // Suscribir a pedidos entregados hoy por este repartidor
+  const hoy  = (()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');})();
+  const q    = query(
+    collection(db,'pedidos'),
+    where('repartidorId','==',repartidorId),
+    where('estado','==','entregado')
+  );
+
+  const cont = document.getElementById('corteContenido');
+  cont.innerHTML = '<div class="loading">Calculando corte…</div>';
+
+  onSnapshot(q, snap => {
+    const todos = snap.docs.map(d=>({id:d.id,...d.data()}));
+    const hoyArr= todos.filter(p=>{
+      const f = p.fechaEntregaReal
+        ? (p.fechaEntregaReal.toDate?p.fechaEntregaReal.toDate():new Date(p.fechaEntregaReal))
+        : null;
+      const fd=f;return fd && (fd.getFullYear()+'-'+String(fd.getMonth()+1).padStart(2,'0')+'-'+String(fd.getDate()).padStart(2,'0'))===hoy;
+    });
+
+    if(!hoyArr.length) {
+      cont.innerHTML = `<div class="empty">
+        <div class="empty-icon">💰</div>
+        <div class="empty-text">Sin entregas hoy</div>
+      </div>`;
+      return;
+    }
+
+    const efectivo   = hoyArr.filter(p=>p.metodoPago!=='transferencia');
+    const transf     = hoyArr.filter(p=>p.metodoPago==='transferencia');
+    const totalEf    = efectivo.reduce((s,p)=>s+(parseFloat(p.totalFinal)||0),0);
+    const totalTr    = transf.reduce((s,p)=>s+(parseFloat(p.totalFinal)||0),0);
+    const totalTotal = totalEf+totalTr;
+
+    cont.innerHTML = `
+      <div class="corte-card" style="background:var(--morado);color:white;margin-bottom:0.75rem;">
+        <div style="font-size:0.7rem;font-weight:800;opacity:0.8;text-transform:uppercase;margin-bottom:0.3rem;">
+          💰 Total del día — ${hoyArr.length} entrega(s)
+        </div>
+        <div class="corte-total" style="color:white;">
+          $${totalTotal.toLocaleString('es-MX')}
+        </div>
+      </div>
+
+      ${efectivo.length?`
+      <div class="corte-card">
+        <div class="corte-titulo">💵 Efectivo a entregar al admin</div>
+        <div style="font-size:1.5rem;font-weight:900;color:var(--verde);margin-bottom:0.5rem;">
+          $${totalEf.toLocaleString('es-MX')}
+        </div>
+        ${efectivo.map(p=>`<div class="corte-row">
+          <span>${p.nombre||'Sin nombre'} · ${p.colonia||'—'}</span>
+          <span>$${(parseFloat(p.totalFinal)||0).toLocaleString('es-MX')}</span>
+        </div>`).join('')}
+      </div>`:''}
+
+      ${transf.length?`
+      <div class="corte-card">
+        <div class="corte-titulo">🏦 Transferencias</div>
+        <div style="font-size:1.5rem;font-weight:900;color:var(--azul);margin-bottom:0.5rem;">
+          $${totalTr.toLocaleString('es-MX')}
+        </div>
+        ${transf.map(p=>`<div class="corte-row">
+          <span>${p.nombre||'Sin nombre'} · ${p.colonia||'—'}</span>
+          <span>$${(parseFloat(p.totalFinal)||0).toLocaleString('es-MX')}</span>
+        </div>`).join('')}
+      </div>`:''}`;
+  });
+}
+
+// ============================================================
+// NAVEGACIÓN
+// ============================================================
+window.mostrarPag = pag => {
+  document.getElementById('pagPedidos').style.display = pag==='pedidos'?'block':'none';
+  document.getElementById('pagCorte').style.display   = pag==='corte'  ?'block':'none';
+  document.getElementById('navPed').classList.toggle('active', pag==='pedidos');
+  document.getElementById('navCor').classList.toggle('active', pag==='corte');
+  if(pag==='corte') renderCorte();
+};
+
+// ============================================================
+// UTILIDADES
+// ============================================================
+function setCargaMsg(msg) {
+  document.getElementById('cargaMsg').textContent = msg;
+}
+
+function mostrarError(titulo, desc) {
+  document.getElementById('cargando').style.display        = 'none';
+  document.getElementById('pantallaError').style.display   = 'flex';
+  document.getElementById('errorTitulo').textContent       = titulo;
+  document.getElementById('errorDesc').textContent         = desc;
+}
+</script>
+</body>
+</html>

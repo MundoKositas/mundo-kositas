@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#8E24AA">
+<title>Califica tu pedido — Mundo Kositas</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root {
+  --rojo:#8E24AA; --rojo-dark:#6A1B9A; --rojo-light:#F3E5F5;
+  --verde:#27AE60; --verde-light:#D5F5E3;
+  --azul:#2980B9; --amarillo:#F39C12;
+  --gris-dark:#2C3E50; --gris:#7F8C8D; --gris-light:#ECF0F1;
+  --blanco:#FFFFFF; --bg:#F4F4F4; --border:#DDD;
+  --shadow:0 2px 12px rgba(0,0,0,0.07);
+  --shadow-lg:0 8px 32px rgba(0,0,0,0.13);
+  --radius:14px; --radius-sm:10px;
+  --font:'Nunito',sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:var(--font);background:var(--bg);color:var(--gris-dark);
+  -webkit-font-smoothing:antialiased;min-height:100vh;
+  display:flex;flex-direction:column;align-items:center;}
+
+/* PANTALLAS */
+.pantalla{display:none;width:100%;max-width:420px;padding:1.5rem 1.25rem;}
+.pantalla.activa{display:block;}
+
+/* HEADER */
+.resena-header{
+  background:linear-gradient(160deg,#4A148C 0%,var(--rojo) 100%);
+  color:white;padding:2rem 1.5rem 3rem;text-align:center;
+  width:100%;margin-bottom:-2rem;
+}
+.resena-header h1{font-size:1.4rem;font-weight:900;margin-bottom:0.25rem;}
+.resena-header p{font-size:0.85rem;opacity:0.85;font-weight:600;}
+
+/* CARD */
+.resena-card{
+  background:var(--blanco);border-radius:22px;
+  padding:1.75rem 1.5rem;box-shadow:var(--shadow-lg);
+  margin:0 1rem;width:calc(100% - 2rem);max-width:380px;
+}
+
+/* ESTRELLAS */
+.stars-container{
+  display:flex;justify-content:center;gap:0.5rem;
+  margin:1rem 0 0.5rem;
+}
+.star-btn{
+  font-size:2.5rem;cursor:pointer;
+  transition:transform 0.15s;
+  background:none;border:none;padding:0 0.1rem;
+  line-height:1;
+}
+.star-btn:active{transform:scale(0.9);}
+.star-btn.activa{filter:none;}
+.star-btn.inactiva{filter:grayscale(1) opacity(0.4);}
+
+.stars-label{
+  text-align:center;font-size:0.85rem;font-weight:700;
+  color:var(--gris);min-height:1.2em;margin-bottom:0.5rem;
+}
+
+.seccion-titulo{
+  font-size:0.75rem;font-weight:800;color:var(--gris);
+  text-transform:uppercase;letter-spacing:0.07em;
+  margin:1.25rem 0 0.75rem;
+}
+.form-label{
+  display:block;font-size:0.75rem;font-weight:800;color:var(--gris);
+  margin-bottom:0.4rem;text-transform:uppercase;letter-spacing:0.06em;
+}
+.form-control{
+  width:100%;padding:0.8rem 1rem;border:2px solid var(--border);
+  border-radius:var(--radius-sm);font-size:0.95rem;font-weight:600;
+  color:var(--gris-dark);background:var(--blanco);outline:none;
+  font-family:var(--font);-webkit-appearance:none;
+  transition:border-color 0.2s;
+}
+.form-control:focus{border-color:var(--rojo);}
+textarea.form-control{resize:vertical;min-height:90px;line-height:1.5;}
+
+.btn{
+  display:block;width:100%;padding:1rem;border:none;
+  border-radius:var(--radius-sm);font-size:1rem;font-weight:800;
+  font-family:var(--font);cursor:pointer;
+  transition:transform 0.15s;margin-top:1.25rem;
+  background:var(--rojo);color:white;
+  box-shadow:0 4px 12px rgba(142,36,170,0.3);
+}
+.btn:active{transform:scale(0.97);}
+
+/* ESTADO */
+.estado-icon{font-size:4rem;text-align:center;margin:1rem 0 0.75rem;}
+.estado-titulo{font-size:1.3rem;font-weight:900;text-align:center;margin-bottom:0.5rem;}
+.estado-desc{font-size:0.88rem;color:var(--gris);text-align:center;
+  font-weight:600;line-height:1.5;}
+
+.loading-spin{
+  width:48px;height:48px;border:4px solid var(--rojo-light);
+  border-top-color:var(--rojo);border-radius:50%;
+  animation:spin 0.8s linear infinite;margin:2rem auto;
+}
+@keyframes spin{to{transform:rotate(360deg);}}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="resena-header">
+  <h1>🏠 Mundo Kositas</h1>
+  <p>Tu opinión nos ayuda a mejorar</p>
+</div>
+
+<!-- CARGANDO -->
+<div class="pantalla activa" id="pCargando" style="text-align:center;padding-top:3rem;">
+  <div class="resena-card" style="margin-top:2rem;">
+    <div class="loading-spin"></div>
+    <p style="color:var(--gris);font-weight:600;text-align:center;">Cargando…</p>
+  </div>
+</div>
+
+<!-- FORMULARIO DE RESEÑA -->
+<div class="pantalla" id="pFormulario" style="padding-top:3rem;">
+  <div class="resena-card">
+    <div id="infoCliente" style="text-align:center;margin-bottom:1rem;">
+      <div style="font-size:1rem;font-weight:800;" id="saludo"></div>
+      <div style="font-size:0.82rem;color:var(--gris);font-weight:600;margin-top:0.2rem;" id="infoProducto"></div>
+    </div>
+
+    <!-- ESTRELLAS REPARTIDOR -->
+    <div class="seccion-titulo">🚴 ¿Cómo fue la entrega del repartidor?</div>
+    <div class="stars-container" id="starsRep"></div>
+    <div class="stars-label" id="labelRep">Toca para calificar</div>
+
+    <!-- ESTRELLAS SERVICIO -->
+    <div class="seccion-titulo">🏠 ¿Cómo calificarías el servicio en general?</div>
+    <div class="stars-container" id="starsSrv"></div>
+    <div class="stars-label" id="labelSrv">Toca para calificar</div>
+
+    <!-- COMENTARIO -->
+    <div style="margin-top:1rem;">
+      <label class="form-label">Comentario (opcional)</label>
+      <textarea id="comentario" class="form-control"
+                placeholder="¿Qué te pareció? ¿Algo que podamos mejorar?…"></textarea>
+    </div>
+
+    <div id="errResena" style="color:#C0392B;font-size:0.82rem;
+         font-weight:700;margin-top:0.5rem;display:none;">
+      Por favor califica el repartidor y el servicio antes de enviar.
+    </div>
+
+    <button class="btn" onclick="enviarResena()" id="btnEnviar">
+      ⭐ Enviar mi calificación
+    </button>
+  </div>
+</div>
+
+<!-- GRACIAS -->
+<div class="pantalla" id="pGracias" style="padding-top:3rem;">
+  <div class="resena-card">
+    <div class="estado-icon">🎉</div>
+    <div class="estado-titulo" style="color:var(--verde);">¡Gracias por tu reseña!</div>
+    <div class="estado-desc">
+      Tu opinión nos ayuda a mejorar nuestro servicio.<br><br>
+      Seguimos trabajando para darte la mejor experiencia 🏠💜
+    </div>
+    <div style="margin-top:1.5rem;text-align:center;">
+      <a href="https://wa.me/526182597230"
+         style="display:inline-flex;align-items:center;gap:0.5rem;
+                background:#25D366;color:white;border-radius:999px;
+                padding:0.7rem 1.5rem;font-weight:800;font-size:0.9rem;
+                text-decoration:none;">
+        💬 Hacer otro pedido
+      </a>
+    </div>
+  </div>
+</div>
+
+<!-- ERROR -->
+<div class="pantalla" id="pError" style="padding-top:3rem;">
+  <div class="resena-card">
+    <div class="estado-icon">⚠️</div>
+    <div class="estado-titulo">Link no válido</div>
+    <div class="estado-desc" id="errorMsg">
+      Este link ya fue usado o expiró.<br>
+      Solo se puede calificar una vez por pedido.
+    </div>
+  </div>
+</div>
+
+<!-- FIREBASE -->
+<script type="module">
+import { initializeApp }   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { getFirestore, doc, getDoc, updateDoc, serverTimestamp, collection, addDoc }
+                           from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+
+const firebaseConfig = {
+  apiKey:            "AIzaSyBxCcpMMZfsOVIgdYQgt1nPBrMAc64T6fE",
+  authDomain:        "mundo-kositas.firebaseapp.com",
+  projectId:         "mundo-kositas",
+  storageBucket:     "mundo-kositas.firebasestorage.app",
+  messagingSenderId: "374505927358",
+  appId:             "1:374505927358:web:8638ae949fd186a92ce4ef"
+};
+
+const app = initializeApp(firebaseConfig);
+const db  = getFirestore(app);
+
+let tokenData  = null;
+let tokenId    = null;
+let estrellaRep = 0;
+let estrellaSrv = 0;
+
+const LABELS = ['','😞 Malo','😐 Regular','🙂 Bien','😊 Muy bien','🤩 Excelente'];
+
+// ── Inicializar estrellas ──────────────────────────────────
+function crearEstrellas(containerId, labelId, tipo) {
+  const cont = document.getElementById(containerId);
+  cont.innerHTML = '';
+  for(let i=1;i<=5;i++) {
+    const btn = document.createElement('button');
+    btn.className    = 'star-btn inactiva';
+    btn.textContent  = '⭐';
+    btn.dataset.val  = i;
+    btn.dataset.tipo = tipo;
+    btn.onclick = () => seleccionarEstrella(tipo, i);
+    cont.appendChild(btn);
+  }
+}
+
+window.seleccionarEstrella = (tipo, val) => {
+  if(tipo==='rep') estrellaRep = val;
+  else             estrellaSrv = val;
+
+  const containerId = tipo==='rep' ? 'starsRep' : 'starsSrv';
+  const labelId     = tipo==='rep' ? 'labelRep'  : 'labelSrv';
+
+  document.querySelectorAll(`#${containerId} .star-btn`).forEach(btn => {
+    const bval = parseInt(btn.dataset.val);
+    btn.className = bval <= val ? 'star-btn activa' : 'star-btn inactiva';
+  });
+  document.getElementById(labelId).textContent = LABELS[val];
+  document.getElementById('errResena').style.display = 'none';
+};
+
+// ── Enviar reseña ──────────────────────────────────────────
+window.enviarResena = async () => {
+  if(!estrellaRep || !estrellaSrv) {
+    document.getElementById('errResena').style.display = 'block';
+    return;
+  }
+
+  const btn = document.getElementById('btnEnviar');
+  btn.disabled    = true;
+  btn.textContent = 'Enviando…';
+
+  try {
+    const comentario = document.getElementById('comentario').value.trim();
+
+    // Actualizar el documento de reseña
+    await updateDoc(doc(db,'resenas',tokenId), {
+      estrellaRepartidor: estrellaRep,
+      estrellaServicio:   estrellaSrv,
+      comentario:         comentario || null,
+      respondida:         true,
+      respondidaEn:       serverTimestamp()
+    });
+
+    // Actualizar calificación promedio del repartidor
+    if(tokenData.repartidorId) {
+      const repRef  = doc(db,'repartidores',tokenData.repartidorId);
+      const repSnap = await getDoc(repRef);
+      if(repSnap.exists()) {
+        const rd   = repSnap.data();
+        const prev = rd.calificacionPromedio || 0;
+        const n    = (rd.totalResenas || 0) + 1;
+        const nuevo= ((prev * (n-1)) + estrellaRep) / n;
+        await updateDoc(repRef, {
+          calificacionPromedio: Math.round(nuevo*10)/10,
+          totalResenas:         n
+        });
+      }
+    }
+
+    mostrar('pGracias');
+  } catch(e) {
+    console.error(e);
+    btn.disabled    = false;
+    btn.textContent = '⭐ Enviar mi calificación';
+    alert('Error al enviar. Intenta de nuevo.');
+  }
+};
+
+// ── Cargar token al iniciar ────────────────────────────────
+async function init() {
+  const params = new URLSearchParams(location.search);
+  const token  = params.get('token');
+
+  if(!token) { mostrar('pError'); return; }
+  tokenId = token;
+
+  try {
+    const snap = await getDoc(doc(db,'resenas',token));
+
+    if(!snap.exists()) {
+      document.getElementById('errorMsg').textContent =
+        'Este link no existe. Verifica que copiaste el link completo.';
+      mostrar('pError'); return;
+    }
+
+    tokenData = snap.data();
+
+    if(tokenData.respondida) {
+      document.getElementById('errorMsg').textContent =
+        'Ya enviaste tu calificación para este pedido. ¡Gracias!';
+      mostrar('pError'); return;
+    }
+
+    if(tokenData.expira && tokenData.expira.toDate() < new Date()) {
+      document.getElementById('errorMsg').textContent =
+        'Este link expiró (válido 7 días). Si deseas calificar, contáctanos.';
+      mostrar('pError'); return;
+    }
+
+    // Llenar datos del cliente
+    document.getElementById('saludo').textContent =
+      tokenData.clienteNombre
+        ? `¡Hola ${tokenData.clienteNombre}! 👋`
+        : '¡Hola! 👋';
+
+    document.getElementById('infoProducto').textContent =
+      tokenData.producto
+        ? `Pedido: ${tokenData.producto}`
+        : 'Cuéntanos cómo estuvo tu experiencia';
+
+    // Crear estrellas interactivas
+    crearEstrellas('starsRep','labelRep','rep');
+    crearEstrellas('starsSrv','labelSrv','srv');
+
+    mostrar('pFormulario');
+
+  } catch(e) {
+    console.error(e);
+    document.getElementById('errorMsg').textContent =
+      'Error de conexión. Verifica tu internet e intenta de nuevo.';
+    mostrar('pError');
+  }
+}
+
+function mostrar(id) {
+  document.querySelectorAll('.pantalla').forEach(p=>p.classList.remove('activa'));
+  document.getElementById(id).classList.add('activa');
+}
+
+init();
+</script>
+</body>
+</html>
