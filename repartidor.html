@@ -458,11 +458,28 @@ window.moverRuta = (idx, dir) => {
 // ============================================================
 window.marcarEntregado = async id => {
   if(!confirm('¿Confirmas que el pedido fue entregado?')) return;
+
+  const pedido = pedidosRep.find(p=>p.id===id) || rutaOrden.find(p=>p.id===id);
+
   await updateDoc(doc(db,'pedidos',id), {
     estado:'entregado',
     fechaEntregaReal: serverTimestamp(),
     'historialEstados.entregado': serverTimestamp()
   });
+
+  // Enviar mensaje de entrega por WhatsApp si hay teléfono
+  if(pedido?.telefono) {
+    const tel  = '52' + pedido.telefono.replace(/\D/g,'');
+    const nom  = pedido.nombre || '';
+    const prod = pedido.producto || '';
+    const tot  = pedido.totalFinal || '';
+    const msg  = encodeURIComponent(
+      '📦 ¡Entregado! Gracias ' + nom + ' 💛\n' +
+      'Fue un gusto atenderte en Mundo Kositas 🏠\n' +
+      '¿Todo llegó bien? Escríbenos 😊'
+    );
+    window.open('https://wa.me/' + tel + '?text=' + msg, '_blank');
+  }
 };
 
 window.abrirNoEntregado = id => {

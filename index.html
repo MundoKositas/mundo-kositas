@@ -529,7 +529,7 @@ select.form-control{
       </div>
       <div style="display:flex;justify-content:space-between;font-size:0.85rem;font-weight:700;margin-bottom:0.25rem;">
         <span>Costo de envío</span>
-        <span><input type="number" id="npEnvio" value="35" oninput="recalcularPedido()"
+        <span><input type="number" id="npEnvio" value="35" min="0" oninput="recalcularPedido()"
                style="width:60px;border:1px solid var(--border);border-radius:6px;
                padding:0.2rem 0.4rem;font-family:var(--font);font-weight:700;
                font-size:0.85rem;text-align:right;"></span>
@@ -1548,6 +1548,8 @@ window.seleccionarDeCatalogo = (_el, nombre, precio) => {
   document.getElementById('npCantLibre').value     = 1;
   document.getElementById('npBuscador').value      = '';
   document.getElementById('npSugerencias').style.display = 'none';
+  // Agregar automáticamente al pedido
+  agregarItemManual();
 };
 
 window.seleccionarProductoCatalogo = window.seleccionarDeCatalogo;
@@ -1609,7 +1611,8 @@ function renderItemsManual() {
 
 window.recalcularPedido = () => {
   const sub = npItems.reduce((s,it)=>s+(it.subtotal||0),0);
-  const env = parseFloat(document.getElementById('npEnvio')?.value)||35;
+  const envRaw = document.getElementById('npEnvio')?.value;
+  const env = (envRaw===''||envRaw===null||envRaw===undefined) ? 35 : Math.max(0, parseFloat(envRaw)||0);
   const tot = sub+env;
   const es = document.getElementById('npSubtotalVal');
   const et = document.getElementById('npTotalVal');
@@ -2215,7 +2218,7 @@ function renderClientes() {
       ${c.domicilio?`<div style="font-size:0.78rem;color:var(--gris);font-weight:600;">📍 ${c.domicilio}, ${c.colonia}</div>`:''}
       <div style="font-size:0.72rem;color:var(--gris);margin-top:0.25rem;">🛍️ ${c.totalPedidos||0} pedido(s)</div>
       ${c.telefono?`<div style="margin-top:0.5rem;display:flex;gap:0.5rem;flex-wrap:wrap;">
-        <a href="https://wa.me/52${c.telefono.replace(/\D/g,'')}?text=${encodeURIComponent('Hola '+(c.nombre||'')+' 👋 Ya puedes ver y pedir desde nuestro catálogo de Mundo Kositas:\n'+ location.origin+'/catalogo.html?tel='+c.telefono.replace(/\D/g,'') +'\n🛍️ Elige tus productos y te los llevamos a domicilio 📦')}"
+        <a href="https://wa.me/52${c.telefono.replace(/\D/g,'')}?text=${encodeURIComponent('Hola '+(c.nombre||'')+' 👋 Ya puedes ver y pedir desde nuestro catálogo de Mundo Kositas:\n'+ location.origin+location.pathname.replace(/[^/]*$/,'')+"catalogo.html?tel="+c.telefono.replace(/\D/g,'') +'\n🛍️ Elige tus productos y te los llevamos a domicilio 📦')}"
            target="_blank" class="btn-sm btn-sm-wa">
           📤 Enviar catálogo
         </a>
@@ -3005,11 +3008,17 @@ window.ejecutarReporte = () => {
 
   const pedFiltrados = pedidosAll.filter(p => {
     if(p.estado !== 'entregado') return false;
-    const f = p.fechaEntregaReal
-      ? (p.fechaEntregaReal.toDate?p.fechaEntregaReal.toDate():new Date(p.fechaEntregaReal))
-      : (p.creadoEn?.toDate?p.creadoEn.toDate():new Date(p.creadoEn));
-    const fd = f.toISOString().split('T')[0];
-    return fd >= desde && fd <= hasta;
+    // Usar fechaEntrega (día de pago) si existe, si no fechaEntregaReal
+    let fechaRef = p.fechaEntrega || null;
+    if(!fechaRef && p.fechaEntregaReal) {
+      const f = p.fechaEntregaReal.toDate?p.fechaEntregaReal.toDate():new Date(p.fechaEntregaReal);
+      fechaRef = f.getFullYear()+'-'+String(f.getMonth()+1).padStart(2,'0')+'-'+String(f.getDate()).padStart(2,'0');
+    }
+    if(!fechaRef && p.creadoEn) {
+      const f = p.creadoEn.toDate?p.creadoEn.toDate():new Date(p.creadoEn);
+      fechaRef = f.getFullYear()+'-'+String(f.getMonth()+1).padStart(2,'0')+'-'+String(f.getDate()).padStart(2,'0');
+    }
+    return fechaRef >= desde && fechaRef <= hasta;
   });
 
   const cont = document.getElementById('rptResultado');
