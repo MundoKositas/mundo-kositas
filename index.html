@@ -1525,17 +1525,20 @@ window.buscarEnCatalogo = () => {
     (p.variantes||[]).some(v=>(v.nombre||'').toLowerCase().includes(q)));
   if(!res.length) { if(sug) sug.style.display='none'; return; }
   sug.style.display='block';
+  // Helper: escapar nombre para uso seguro en atributo onclick
+  const esc = s => s.replace(/'/g,"\\'").replace(/"/g,'&quot;');
+
   sug.innerHTML = res.flatMap(p=>{
     const vars=(p.variantes||[]).filter(v=>v.activa!==false);
     if(vars.length) return vars.map(v=>{
       const nom=p.nombre+(v.nombre?` — ${v.nombre}`:'');
       const pr=v.precio||p.precio;
-      return `<div onclick="seleccionarDeCatalogo(this,'${nom.replace(/'/g,"\\'")}',${pr})"
+      return `<div onclick="seleccionarDeCatalogo(this,'${esc(nom)}',${pr})"
         style="padding:0.65rem 1rem;cursor:pointer;border-bottom:1px solid var(--border);
                font-size:0.85rem;font-weight:700;display:flex;justify-content:space-between;">
         <span>${nom}</span><span style="color:var(--rojo);font-weight:900;">$${pr}</span></div>`;
     });
-    return [`<div onclick="seleccionarDeCatalogo(this,'${p.nombre.replace(/'/g,"\\'")}',${p.precio})"
+    return [`<div onclick="seleccionarDeCatalogo(this,'${esc(p.nombre)}',${p.precio})"
       style="padding:0.65rem 1rem;cursor:pointer;border-bottom:1px solid var(--border);
              font-size:0.85rem;font-weight:700;display:flex;justify-content:space-between;">
       <span>${p.nombre}</span><span style="color:var(--rojo);font-weight:900;">$${p.precio}</span></div>`];
@@ -1543,7 +1546,11 @@ window.buscarEnCatalogo = () => {
 };
 
 window.seleccionarDeCatalogo = (_el, nombre, precio) => {
-  document.getElementById('npProductoLibre').value = nombre;
+  // Decodificar entidades HTML en el nombre (ej: &quot; → ")
+  const txt = document.createElement('textarea');
+  txt.innerHTML = nombre;
+  const nomDecoded = txt.value;
+  document.getElementById('npProductoLibre').value = nomDecoded;
   document.getElementById('npPrecioLibre').value   = precio;
   document.getElementById('npCantLibre').value     = 1;
   document.getElementById('npBuscador').value      = '';
@@ -1986,9 +1993,13 @@ window.editarProducto = id => {
 };
 
 window.guardarProducto = async () => {
-  const nombre  = document.getElementById('prNombre').value.trim();
+  const nombreRaw = document.getElementById('prNombre').value.trim();
   const precio  = parseFloat(document.getElementById('prPrecio').value);
-  if(!nombre||isNaN(precio)) { alert('Nombre y precio son obligatorios.'); return; }
+  if(!nombreRaw||isNaN(precio)) { alert('Nombre y precio son obligatorios.'); return; }
+  // Reemplazar comillas que rompen el buscador por equivalentes seguros
+  const nombre = nombreRaw
+    .replace(/"/g, ' pulgadas')  // 8" → 8 pulgadas
+    .replace(/'/g, '');          // quitar comillas simples
 
   // Comprimir foto general como base64 (sin Firebase Storage)
   let fotoUrl = document.getElementById('prFotoUrl').value.trim();
@@ -2699,8 +2710,25 @@ function linkCatalogo(tel) {
 // ============================================================
 window.abrirModal  = id => document.getElementById(id).classList.add('open');
 window.cerrarModal = id => document.getElementById(id).classList.remove('open');
+// Modales que NO cierran al hacer click fuera (tienen formularios)
+const MODALES_PROTEGIDOS = [
+  'modalNuevoPedido','modalEditarPedido','modalProducto',
+  'modalVariante','modalRepartidor','modalZona','modalCategoria'
+];
+
 document.querySelectorAll('.modal-overlay').forEach(o=>{
-  o.addEventListener('click', e => { if(e.target===o) o.classList.remove('open'); });
+  o.addEventListener('click', e => {
+    if(e.target !== o) return; // solo si fue en el overlay, no en el contenido
+    if(MODALES_PROTEGIDOS.includes(o.id)) {
+      // Formularios importantes — confirmar antes de cerrar
+      if(confirm('¿Deseas cerrar sin guardar?')) {
+        o.classList.remove('open');
+      }
+    } else {
+      // Modales de solo lectura — cerrar sin confirmar
+      o.classList.remove('open');
+    }
+  });
 });
 
 // ============================================================
