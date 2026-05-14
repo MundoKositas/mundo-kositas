@@ -253,7 +253,7 @@ button{cursor:pointer;font-family:var(--font);}
 import { initializeApp }    from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import { getAuth, signInAnonymously, onAuthStateChanged }
                             from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
-import { getFirestore, collection, doc, getDoc, updateDoc, onSnapshot,
+import { getFirestore, collection, doc, getDoc, updateDoc, setDoc, onSnapshot,
          query, where, orderBy, serverTimestamp }
                             from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
@@ -467,18 +467,40 @@ window.marcarEntregado = async id => {
     'historialEstados.entregado': serverTimestamp()
   });
 
-  // Enviar mensaje de entrega por WhatsApp si hay teléfono
+  // Enviar mensaje de entrega + link de reseña por WhatsApp
   if(pedido?.telefono) {
-    const tel  = '52' + pedido.telefono.replace(/\D/g,'');
-    const nom  = pedido.nombre || '';
-    const prod = pedido.producto || '';
-    const tot  = pedido.totalFinal || '';
-    const msg  = encodeURIComponent(
-      '📦 ¡Entregado! Gracias ' + nom + ' 💛\n' +
-      'Fue un gusto atenderte en Mundo Kositas 🏠\n' +
-      '¿Todo llegó bien? Escríbenos 😊'
-    );
-    window.open('https://wa.me/' + tel + '?text=' + msg, '_blank');
+    const tel = '52' + pedido.telefono.replace(/\D/g,'');
+    const nom = pedido.nombre || '';
+
+    // Generar token de reseña (válido 7 días)
+    const token  = Math.random().toString(36).slice(2) + Date.now().toString(36);
+    const expira = new Date();
+    expira.setDate(expira.getDate() + 7);
+
+    await setDoc(doc(db,'resenas',token), {
+      pedidoId:          id,
+      repartidorId:      repartidorId,
+      repartidorNombre:  repartidorNom,
+      clienteNombre:     nom,
+      clienteTel:        pedido.telefono,
+      producto:          pedido.producto || null,
+      expira,
+      respondida:        false,
+      creadoEn:          serverTimestamp()
+    });
+
+    // Construir URL de la reseña
+    const base      = location.origin + location.pathname.replace(/[^/]*$/, '');
+    const linkResena = base + 'resena.html?token=' + token;
+
+    const msgEntrega = '📦 ¡Entregado! Gracias ' + nom + ' 💛\n'
+      + 'Fue un gusto atenderte en Mundo Kositas 🏠\n'
+      + '¿Todo llegó bien? Escríbenos 😊\n\n'
+      + '⭐ ¿Cómo estuvo tu experiencia?\n'
+      + 'Califica nuestro servicio aquí 👇\n'
+      + linkResena;
+
+    window.open('https://wa.me/' + tel + '?text=' + encodeURIComponent(msgEntrega), '_blank');
   }
 };
 
