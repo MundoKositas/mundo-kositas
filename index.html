@@ -350,6 +350,11 @@ select.form-control{
         <div id="configContenido"></div>
       </div>
 
+      <!-- Usuarios / Roles -->
+      <div id="pagUsuarios" class="page">
+        <div id="usuariosContenido"></div>
+      </div>
+
     </div>
 
     <!-- VISTA REPARTIDOR -->
@@ -430,6 +435,13 @@ select.form-control{
                      padding:0.85rem 0.5rem;cursor:pointer;font-family:var(--font);">
         <span style="font-size:1.6rem;">⚙️</span>
         <span style="font-size:0.72rem;font-weight:800;color:var(--gris-dark);">Config</span>
+      </button>
+      <button id="btnMenuUsuarios" onclick="mostrarPagDesdeMenu('usuarios')"
+              style="display:none;flex-direction:column;align-items:center;gap:0.3rem;
+                     background:var(--gris-light);border:none;border-radius:var(--radius);
+                     padding:0.85rem 0.5rem;cursor:pointer;font-family:var(--font);">
+        <span style="font-size:1.6rem;">👤</span>
+        <span style="font-size:0.72rem;font-weight:800;color:var(--gris-dark);">Usuarios</span>
       </button>
     </div>
   </div>
@@ -1003,6 +1015,53 @@ select.form-control{
   </div>
 </div>
 
+<!-- MODAL: USUARIO -->
+<div class="modal-overlay" id="modalUsuario">
+  <div class="modal-sheet">
+    <div class="modal-header">
+      <span class="modal-title" id="modalUsuarioTitulo">👤 Nuevo Usuario</span>
+      <button class="modal-close" onclick="cerrarModal('modalUsuario')">✕</button>
+    </div>
+    <div id="usuarioError" class="alert alert-danger"></div>
+    <div class="form-group">
+      <label class="form-label">Nombre completo *</label>
+      <input type="text" id="uNombre" class="form-control" placeholder="Nombre del usuario">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Correo electrónico *</label>
+      <input type="email" id="uEmail" class="form-control" placeholder="correo@email.com">
+      <div style="font-size:0.72rem;color:var(--gris);margin-top:0.3rem;font-weight:600;">
+        Este correo se usará para iniciar sesión
+      </div>
+    </div>
+    <div class="form-group" id="uPasswordGroup">
+      <label class="form-label">Contraseña *</label>
+      <input type="password" id="uPassword" class="form-control" placeholder="Mínimo 8 caracteres">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Rol</label>
+      <select id="uRol" class="form-control">
+        <option value="supervisor">👔 Supervisor</option>
+      </select>
+      <div style="font-size:0.72rem;color:var(--gris);margin-top:0.3rem;font-weight:600;">
+        El supervisor tiene acceso a todo igual que el administrador,
+        excepto la gestión de usuarios.
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Estado</label>
+      <select id="uEstado" class="form-control">
+        <option value="activo">✅ Activo</option>
+        <option value="inactivo">🔴 Inactivo</option>
+      </select>
+    </div>
+    <input type="hidden" id="uId">
+    <button class="btn btn-rojo" id="btnGuardarUsuario" onclick="guardarUsuario()">
+      💾 Guardar Usuario
+    </button>
+  </div>
+</div>
+
 <!-- MODAL: ZONA DE ENTREGA -->
 <div class="modal-overlay" id="modalZona">
   <div class="modal-sheet">
@@ -1181,10 +1240,25 @@ function iniciarApp(datos) {
     document.getElementById('vistaAdmin').style.display = 'block';
     document.getElementById('navAdmin').style.display   = 'flex';
     document.getElementById('btnAddPedido').style.display = 'block';
+    // Mostrar gestión de usuarios solo al dueño (admin)
+    const btnUsr = document.getElementById('btnMenuUsuarios');
+    if(btnUsr) btnUsr.style.display = rolActual==='admin' ? 'flex' : 'none';
+    // Registrar último acceso del supervisor (async, sin await aquí)
+    if(rolActual==='supervisor') {
+      getDocs(query(collection(db,'usuarios'), where('uid','==',user.uid)))
+        .then(snapU => {
+          if(!snapU.empty) {
+            updateDoc(doc(db,'usuarios',snapU.docs[0].id), {
+              ultimoAcceso: serverTimestamp()
+            });
+          }
+        });
+    }
     suscribirPedidos(); suscribirRepartidores();
     suscribirProductos(); suscribirClientes();
     suscribirCategorias(); suscribirZonas();
     cargarMensajes(); cargarConfig(); suscribirResenas();
+    suscribirUsuarios();
   } else {
     document.getElementById('vistaRepartidor').style.display = 'block';
     document.getElementById('navRepartidor').style.display   = 'flex';
@@ -2473,13 +2547,15 @@ window.mostrarPag = (pag, btn) => {
     pedidos:'pagPedidos', repartidores:'pagRepartidores',
     catalogo:'pagCatalogo', clientes:'pagClientes',
     categorias:'pagCategorias', corte:'pagCorte', reportes:'pagReportes',
-    zonas:'pagZonas', mensajes:'pagMensajes', config:'pagConfig'
+    zonas:'pagZonas', mensajes:'pagMensajes', config:'pagConfig',
+    usuarios:'pagUsuarios'
   };
   const titulos = {
     pedidos:'Mundo Kositas', repartidores:'Repartidores',
     catalogo:'Catálogo', clientes:'Clientes',
     categorias:'Categorías', corte:'Corte del Día', reportes:'Reportes',
-    zonas:'Zonas de Entrega', mensajes:'Mensajes WhatsApp', config:'Configuración'
+    zonas:'Zonas de Entrega', mensajes:'Mensajes WhatsApp', config:'Configuración',
+    usuarios:'Usuarios y Accesos'
   };
   document.querySelectorAll('#vistaAdmin .page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('#navAdmin .nav-btn').forEach(b=>b.classList.remove('active'));
@@ -2491,6 +2567,7 @@ window.mostrarPag = (pag, btn) => {
   if(pag==='reportes') renderReportes();
   if(pag==='mensajes') renderMensajes();
   if(pag==='config')   renderConfig();
+  if(pag==='usuarios') renderUsuarios();
 };
 
 window.abrirMenuMas = btn => {
@@ -2836,6 +2913,214 @@ window.verResenasRepartidor = async repId => {
   abrirModal('modalResenas');
 };
 
+
+// ============================================================
+// M7 — GESTIÓN DE USUARIOS Y ACCESOS
+// ============================================================
+let usuariosAll = [];
+
+function suscribirUsuarios() {
+  const u = onSnapshot(collection(db,'usuarios'), snap => {
+    usuariosAll = snap.docs.map(d=>({id:d.id,...d.data()}));
+    if(document.getElementById('pagUsuarios')?.classList.contains('active')) {
+      renderUsuarios();
+    }
+  });
+  unsubs.push(u);
+}
+
+function renderUsuarios() {
+  const cont = document.getElementById('usuariosContenido');
+  if(!cont) return;
+
+  // Solo el dueño puede gestionar usuarios
+  if(rolActual !== 'admin') {
+    cont.innerHTML = `<div class="empty">
+      <div class="empty-icon">🔒</div>
+      <div class="empty-text">Solo el administrador puede gestionar usuarios</div>
+    </div>`;
+    return;
+  }
+
+  const supervisores = usuariosAll.filter(u=>u.rol==='supervisor');
+
+  cont.innerHTML = `
+    <button class="btn btn-rojo" style="margin-bottom:1rem;" onclick="abrirModalUsuario()">
+      + Agregar Supervisor
+    </button>
+
+    <div style="background:var(--azul-light);border-radius:var(--radius-sm);
+         padding:0.75rem;margin-bottom:1rem;font-size:0.8rem;font-weight:700;color:#1A5276;">
+      💡 Los supervisores tienen acceso igual al administrador. Solo el administrador
+      puede crear, editar o desactivar cuentas de supervisores.
+    </div>
+
+    ${!supervisores.length ? `
+    <div class="empty">
+      <div class="empty-icon">👔</div>
+      <div class="empty-text">Sin supervisores registrados</div>
+    </div>` : supervisores.map(u=>`
+    <div class="card" style="margin-bottom:0.75rem;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+        <div>
+          <div style="font-weight:900;font-size:0.95rem;">
+            ${u.activo!==false?'✅':'🔴'} ${u.nombre||'Sin nombre'}
+          </div>
+          <div style="font-size:0.8rem;color:var(--gris);font-weight:600;margin-top:0.2rem;">
+            📧 ${u.email||'—'}
+          </div>
+          <div style="font-size:0.75rem;color:var(--gris);font-weight:600;margin-top:0.15rem;">
+            👔 Supervisor · ${u.activo!==false?'Activo':'Inactivo'}
+          </div>
+          ${u.ultimoAcceso ? `
+          <div style="font-size:0.72rem;color:var(--gris);margin-top:0.1rem;">
+            Último acceso: ${fmtFH(u.ultimoAcceso)}
+          </div>` : ''}
+        </div>
+        <div style="display:flex;gap:0.4rem;">
+          <button class="btn-icon bi-azul" onclick="editarUsuario('${u.id}')">✏️</button>
+          <button class="btn-icon ${u.activo!==false?'bi-gris':'bi-verde'}"
+                  onclick="toggleUsuario('${u.id}',${u.activo!==false})"
+                  title="${u.activo!==false?'Desactivar':'Activar'}">
+            ${u.activo!==false?'🔴':'✅'}
+          </button>
+        </div>
+      </div>
+    </div>`).join('')}`;
+}
+
+window.abrirModalUsuario = () => {
+  document.getElementById('modalUsuarioTitulo').textContent = '👤 Nuevo Supervisor';
+  document.getElementById('uId').value      = '';
+  document.getElementById('uNombre').value  = '';
+  document.getElementById('uEmail').value   = '';
+  document.getElementById('uPassword').value= '';
+  document.getElementById('uEstado').value  = 'activo';
+  document.getElementById('uPasswordGroup').style.display = 'block';
+  document.getElementById('usuarioError').classList.remove('show');
+  document.getElementById('btnGuardarUsuario').textContent = '💾 Crear Usuario';
+  abrirModal('modalUsuario');
+};
+
+window.editarUsuario = id => {
+  const u = usuariosAll.find(x=>x.id===id); if(!u) return;
+  document.getElementById('modalUsuarioTitulo').textContent = '✏️ Editar Supervisor';
+  document.getElementById('uId').value      = id;
+  document.getElementById('uNombre').value  = u.nombre||'';
+  document.getElementById('uEmail').value   = u.email||'';
+  document.getElementById('uPassword').value= '';
+  document.getElementById('uEstado').value  = u.activo!==false?'activo':'inactivo';
+  // Al editar, la contraseña es opcional
+  document.getElementById('uPasswordGroup').style.display = 'block';
+  document.getElementById('uPassword').placeholder = 'Dejar vacío para no cambiar';
+  document.getElementById('uPassword').required = false;
+  document.getElementById('usuarioError').classList.remove('show');
+  document.getElementById('btnGuardarUsuario').textContent = '💾 Guardar Cambios';
+  abrirModal('modalUsuario');
+};
+
+window.guardarUsuario = async () => {
+  const nombre   = document.getElementById('uNombre').value.trim();
+  const email    = document.getElementById('uEmail').value.trim();
+  const password = document.getElementById('uPassword').value;
+  const estado   = document.getElementById('uEstado').value;
+  const id       = document.getElementById('uId').value;
+  const err      = document.getElementById('usuarioError');
+  err.classList.remove('show');
+
+  if(!nombre || !email) {
+    err.textContent = 'Nombre y correo son obligatorios.';
+    err.classList.add('show'); return;
+  }
+
+  if(!id && !password) {
+    err.textContent = 'La contraseña es obligatoria para nuevos usuarios.';
+    err.classList.add('show'); return;
+  }
+
+  if(password && password.length < 8) {
+    err.textContent = 'La contraseña debe tener al menos 8 caracteres.';
+    err.classList.add('show'); return;
+  }
+
+  const btn = document.getElementById('btnGuardarUsuario');
+  btn.disabled    = true;
+  btn.textContent = '⏳ Guardando…';
+
+  try {
+    if(!id) {
+      // CREAR usuario nuevo en Firebase Auth mediante la API REST
+      const apiKey = "AIzaSyBxCcpMMZfsOVIgdYQgt1nPBrMAc64T6fE";
+      const resp = await fetch(
+        `https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password, returnSecureToken: true })
+        }
+      );
+      const data = await resp.json();
+
+      if(data.error) {
+        const msgs = {
+          'EMAIL_EXISTS':          'Ese correo ya está registrado.',
+          'WEAK_PASSWORD':         'La contraseña es muy débil.',
+          'INVALID_EMAIL':         'El correo no es válido.',
+          'TOO_MANY_ATTEMPTS_TRY_LATER': 'Demasiados intentos. Espera un momento.'
+        };
+        throw new Error(msgs[data.error.message] || data.error.message);
+      }
+
+      // Guardar en Firestore
+      await addDoc(collection(db,'usuarios'), {
+        uid:      data.localId,
+        email,
+        nombre,
+        rol:      'supervisor',
+        activo:   estado==='activo',
+        creadoEn: serverTimestamp()
+      });
+
+    } else {
+      // EDITAR usuario existente
+      const datos = {
+        nombre,
+        activo: estado==='activo'
+      };
+
+      // Cambiar contraseña si se ingresó
+      if(password) {
+        const u = usuariosAll.find(x=>x.id===id);
+        if(u?.uid) {
+          const apiKey = "AIzaSyBxCcpMMZfsOVIgdYQgt1nPBrMAc64T6fE";
+          // Necesitamos el idToken del admin para cambiar contraseña de otro usuario
+          // Firebase Admin SDK no está disponible en el front-end
+          // Alternativa: el supervisor restablece su propia contraseña
+          mostrarToastAdmin('⚠️ Para cambiar contraseña, usa Firebase Console → Authentication');
+        }
+      }
+
+      await updateDoc(doc(db,'usuarios',id), datos);
+    }
+
+    cerrarModal('modalUsuario');
+    mostrarToastAdmin('✅ Usuario guardado correctamente');
+
+  } catch(e) {
+    err.textContent = 'Error: ' + e.message;
+    err.classList.add('show');
+  } finally {
+    btn.disabled    = false;
+    btn.textContent = '💾 Guardar Usuario';
+  }
+};
+
+window.toggleUsuario = async (id, activo) => {
+  const accion = activo ? 'desactivar' : 'activar';
+  if(!confirm(`¿${accion.charAt(0).toUpperCase()+accion.slice(1)} este usuario?`)) return;
+  await updateDoc(doc(db,'usuarios',id), { activo: !activo });
+  mostrarToastAdmin(`✅ Usuario ${activo?'desactivado':'activado'}`);
+};
 
 function fmtFH(ts) {
   if(!ts) return '—';
