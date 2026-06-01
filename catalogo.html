@@ -662,14 +662,14 @@ async function cargarCategorias() {
 
 async function cargarProductos() {
   try {
-    // Cargar todos los productos sin filtros (evita problemas de índices)
     const snap = await getDocs(collection(db,'productos'));
     productos = snap.docs
       .map(d=>({id:d.id,...d.data()}))
-      // Filtrar visibles en JavaScript (más confiable que where en Firestore)
       .filter(p => p.visible === true || p.visible === 'true')
       .sort((a,b)=>(a.nombre||'').localeCompare(b.nombre||''));
     console.log('Productos cargados:', productos.length);
+    // Volver a renderizar categorías ahora que tenemos productos con fotos
+    renderCategorias();
   } catch(e) {
     console.error('Error cargando productos:', e);
   }
