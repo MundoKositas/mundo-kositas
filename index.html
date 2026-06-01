@@ -1004,6 +1004,75 @@ select.form-control{
   </div>
 </div>
 
+<!-- MODAL: ENTREGA DE PRODUCTOS AL REPARTIDOR -->
+<div class="modal-overlay" id="modalEntregaRep">
+  <div class="modal-sheet">
+    <div class="modal-header">
+      <span class="modal-title" id="modalEntregaRepTitulo">📦 Entregar a Repartidor</span>
+      <button class="modal-close" onclick="cerrarModal('modalEntregaRep')">✕</button>
+    </div>
+
+    <!-- Lista de pedidos asignados -->
+    <div style="font-size:0.75rem;font-weight:800;color:var(--gris);
+         text-transform:uppercase;letter-spacing:0.06em;margin-bottom:0.5rem;">
+      Pedidos asignados para hoy
+    </div>
+    <div id="entregaRepLista" style="margin-bottom:1rem;"></div>
+
+    <!-- Confirmación supervisor -->
+    <div id="entregaRepConfSuper" style="background:#FEF9E7;border-radius:var(--radius-sm);
+         padding:0.85rem;margin-bottom:0.75rem;">
+      <div style="font-weight:800;font-size:0.88rem;margin-bottom:0.5rem;">
+        ✅ Confirmación del Supervisor
+      </div>
+      <div style="font-size:0.8rem;color:var(--gris);margin-bottom:0.5rem;">
+        Confirmo que entregué los productos listados arriba al repartidor,
+        en buen estado y completos.
+      </div>
+      <button class="btn-sm btn-sm-verde" onclick="supervisorConfirmaEntrega()"
+              id="btnSuperConf" style="width:100%;justify-content:center;">
+        ✅ Confirmar entrega al repartidor
+      </button>
+    </div>
+
+    <!-- Token para que el repartidor confirme -->
+    <div id="entregaRepQR" style="display:none;background:var(--verde-light);
+         border-radius:var(--radius-sm);padding:0.85rem;text-align:center;">
+      <div style="font-weight:800;font-size:0.88rem;margin-bottom:0.5rem;color:var(--verde);">
+        ✅ Supervisor confirmó — Esperando al repartidor
+      </div>
+      <div style="font-size:0.8rem;color:var(--gris);margin-bottom:0.75rem;">
+        El repartidor debe confirmar desde su celular que recibió los productos.
+      </div>
+      <div id="entregaRepCodigo" style="font-size:2rem;font-weight:900;
+           letter-spacing:0.15em;color:var(--verde);margin-bottom:0.5rem;"></div>
+      <div style="font-size:0.72rem;color:var(--gris);font-weight:600;">
+        El repartidor ingresa este código en su app
+      </div>
+    </div>
+
+    <input type="hidden" id="entregaRepId">
+    <input type="hidden" id="entregaRepToken">
+  </div>
+</div>
+
+<!-- MODAL: DEVOLUCIÓN DE PRODUCTOS -->
+<div class="modal-overlay" id="modalDevolucion">
+  <div class="modal-sheet">
+    <div class="modal-header">
+      <span class="modal-title">📦 Devolución de Productos</span>
+      <button class="modal-close" onclick="cerrarModal('modalDevolucion')">✕</button>
+    </div>
+    <div style="font-size:0.8rem;color:var(--gris);font-weight:600;margin-bottom:0.75rem;">
+      Registra los productos que devuelve el repartidor
+    </div>
+    <div id="devolucionLista"></div>
+    <button class="btn btn-rojo" onclick="finalizarDevolucion()">
+      💾 Registrar devolución y reasignar pedidos
+    </button>
+  </div>
+</div>
+
 <!-- MODAL: RESEÑAS DEL REPARTIDOR -->
 <div class="modal-overlay" id="modalResenas">
   <div class="modal-sheet">
@@ -1866,6 +1935,11 @@ function renderRepartidores() {
       </div>
     </div><!-- /rep-card-top -->
     <div style="padding:0 1rem 0.85rem;border-top:1px solid var(--border);display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+      <button class="btn-sm btn-sm-verde"
+              onclick="abrirEntregaRepartidor('${r.id}','${r.nombre}')"
+              style="margin-top:0.6rem;">
+        📦 Entregar productos
+      </button>
       <button class="btn-sm btn-sm-naranja"
               onclick="abrirReasignarTodos('${r.id}','${r.nombre}')"
               style="margin-top:0.6rem;">
@@ -1922,7 +1996,11 @@ window.guardarRepartidor = async () => {
 
 window.generarLink = async (repId, repNombre, repTel) => {
   const token  = Math.random().toString(36).slice(2)+Date.now().toString(36);
-  const expira = new Date(); expira.setHours(23,59,59,999);
+  // Medianoche hora de Durango (UTC-6): 06:00:00 UTC del día siguiente
+  const hoyLocal = new Date();
+  const expira   = new Date(
+    hoyLocal.getFullYear(), hoyLocal.getMonth(), hoyLocal.getDate()+1, 6, 0, 0
+  ); // 6am UTC = medianoche Durango
 
   // Usamos setDoc con el token como ID del documento
   // Así validarToken puede encontrarlo directamente
@@ -1975,13 +2053,55 @@ window.asignarRep = async (repId, repNombre, repTel) => {
 // ============================================================
 // PRODUCTOS + VARIANTES
 // ============================================================
+let filtroCatAdmin = '';   // categoría activa en admin
+let filtroTextoAdmin = ''; // búsqueda activa en admin
+
 function renderProductos() {
   const lista = document.getElementById('listaProductos');
-  if(!productosAll.length) {
+
+  // Barra de filtros si no existe
+  if(!document.getElementById('adminProdFiltros')) {
+    const barra = document.createElement('div');
+    barra.id = 'adminProdFiltros';
+    barra.style.cssText = 'margin-bottom:0.75rem;display:flex;flex-direction:column;gap:0.5rem;';
+    barra.innerHTML = `
+      <input type="text" id="adminProdBusq" class="form-control"
+             placeholder="🔍 Buscar producto…" oninput="filtrarProductosAdmin()"
+             style="border-radius:999px;">
+      <div id="adminCatFiltros" style="display:flex;flex-wrap:wrap;gap:0.35rem;">
+        <button onclick="filtrarCatAdmin('')"
+                class="btn-sm" id="catAll"
+                style="background:var(--rojo);color:white;border-radius:999px;
+                       padding:0.3rem 0.85rem;border:none;font-size:0.75rem;font-weight:800;">
+          Todos
+        </button>
+        ${categoriasAll.map(c=>`
+          <button onclick="filtrarCatAdmin('${c.id}')"
+                  id="catF_${c.id}"
+                  style="background:var(--gris-light);border-radius:999px;border:none;
+                         padding:0.3rem 0.85rem;font-size:0.75rem;font-weight:800;cursor:pointer;">
+            ${c.emoji||''} ${c.nombre}
+          </button>`).join('')}
+      </div>`;
+    lista.parentNode.insertBefore(barra, lista);
+  }
+
+  // Aplicar filtros
+  let prods = [...productosAll];
+  if(filtroCatAdmin) prods = prods.filter(p=>p.categoria===filtroCatAdmin);
+  if(filtroTextoAdmin) {
+    const palabras = filtroTextoAdmin.toLowerCase().split(' ').filter(Boolean);
+    prods = prods.filter(p => {
+      const txt = ((p.nombre||'')+' '+(p.descripcion||'')).toLowerCase();
+      return palabras.every(pal=>txt.includes(pal));
+    });
+  }
+
+  if(!prods.length) {
     lista.innerHTML='<div class="empty"><div class="empty-icon">📦</div><div class="empty-text">Sin productos</div></div>';
     return;
   }
-  lista.innerHTML = productosAll.map(p=>{
+  lista.innerHTML = prods.map(p=>{
     const vars = p.variantes||[];
     const fotoHTML = vars[0]?.foto
       ? `<img src="${vars[0].foto}" style="width:52px;height:52px;object-fit:cover;border-radius:10px;flex-shrink:0;">`
@@ -2127,6 +2247,23 @@ window.guardarProducto = async () => {
 
 window.toggleVisible = async (id, visible) => {
   await updateDoc(doc(db,'productos',id), { visible: !visible });
+};
+
+window.filtrarProductosAdmin = () => {
+  filtroTextoAdmin = document.getElementById('adminProdBusq')?.value.trim() || '';
+  renderProductos();
+};
+
+window.filtrarCatAdmin = catId => {
+  filtroCatAdmin = catId;
+  // Resaltar botón activo
+  document.querySelectorAll('#adminCatFiltros button').forEach(b => {
+    b.style.background = 'var(--gris-light)';
+    b.style.color = 'var(--gris-dark)';
+  });
+  const activo = document.getElementById(catId ? 'catF_'+catId : 'catAll');
+  if(activo) { activo.style.background='var(--rojo)'; activo.style.color='white'; }
+  renderProductos();
 };
 
 // ── VARIANTES ──────────────────────────────────────────────
@@ -2911,6 +3048,183 @@ window.verResenasRepartidor = async repId => {
         </div>`).join('')}`;
   }
   abrirModal('modalResenas');
+};
+
+
+// ============================================================
+// ENTREGA DE PRODUCTOS AL REPARTIDOR (Supervisor → Repartidor)
+// ============================================================
+let entregaRepActual = null; // { repId, repNombre, pedidos }
+
+window.abrirEntregaRepartidor = async (repId, repNombre) => {
+  entregaRepActual = { repId, repNombre };
+  document.getElementById('modalEntregaRepTitulo').textContent = '📦 Entregar a ' + repNombre;
+  document.getElementById('entregaRepId').value    = repId;
+  document.getElementById('entregaRepQR').style.display        = 'none';
+  document.getElementById('entregaRepConfSuper').style.display = 'block';
+  document.getElementById('btnSuperConf').disabled = false;
+  document.getElementById('btnSuperConf').textContent = '✅ Confirmar entrega al repartidor';
+
+  // Obtener fecha de hoy local
+  const d   = new Date();
+  const hoy = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+
+  // Pedidos asignados a este repartidor para hoy
+  const pedidosHoy = pedidosAll.filter(p =>
+    p.repartidorId === repId &&
+    p.estado === 'asignado' &&
+    p.fechaEntrega <= hoy
+  );
+
+  entregaRepActual.pedidos = pedidosHoy;
+
+  const lista = document.getElementById('entregaRepLista');
+  if(!pedidosHoy.length) {
+    lista.innerHTML = `<div style="text-align:center;color:var(--gris);
+      font-size:0.85rem;font-weight:600;padding:1rem;">
+      Sin pedidos asignados para hoy</div>`;
+  } else {
+    lista.innerHTML = pedidosHoy.map(p => {
+      const items = (p.items&&p.items.length)
+        ? p.items.map(it=>it.nombre+(it.cantidad>1?' x'+it.cantidad:'')).join(', ')
+        : (p.producto||'—');
+      return `<div style="padding:0.6rem;background:white;border:1px solid var(--border);
+               border-radius:var(--radius-sm);margin-bottom:0.4rem;">
+        <div style="font-weight:800;font-size:0.85rem;">${p.nombre||'Sin nombre'}</div>
+        <div style="font-size:0.78rem;color:var(--gris);font-weight:600;">
+          📦 ${items}
+        </div>
+        <div style="font-size:0.78rem;color:var(--gris);font-weight:600;">
+          📍 ${p.domicilio||'—'}, ${p.colonia||'—'}
+        </div>
+        <div style="font-weight:900;color:var(--rojo);">$${p.totalFinal||0}</div>
+      </div>`;
+    }).join('');
+  }
+
+  abrirModal('modalEntregaRep');
+};
+
+window.supervisorConfirmaEntrega = async () => {
+  if(!entregaRepActual?.pedidos?.length) {
+    alert('Sin pedidos para confirmar.'); return;
+  }
+
+  const btn = document.getElementById('btnSuperConf');
+  btn.disabled    = true;
+  btn.textContent = '⏳ Confirmando…';
+
+  // Generar código de 4 dígitos para que el repartidor confirme
+  const codigo = Math.floor(1000+Math.random()*9000).toString();
+  document.getElementById('entregaRepToken').value = codigo;
+
+  // Guardar en Firestore que el supervisor confirmó
+  const repId = document.getElementById('entregaRepId').value;
+  const d     = new Date();
+  const hoy   = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+
+  await setDoc(doc(db,'entregasDia',repId+'_'+hoy), {
+    repId,
+    repNombre:          entregaRepActual.repNombre,
+    supervisorConfirmo: true,
+    supervisorConfirmoEn: serverTimestamp(),
+    codigoConfirmacion: codigo,
+    repConfirmo:        false,
+    pedidosIds:         entregaRepActual.pedidos.map(p=>p.id),
+    totalPedidos:       entregaRepActual.pedidos.length
+  });
+
+  // Mostrar código
+  document.getElementById('entregaRepCodigo').textContent = codigo;
+  document.getElementById('entregaRepConfSuper').style.display = 'none';
+  document.getElementById('entregaRepQR').style.display        = 'block';
+
+  mostrarToastAdmin('✅ Confirmado — El repartidor debe ingresar el código: '+codigo);
+};
+
+// ============================================================
+// DEVOLUCIÓN DE PRODUCTOS (al regresar)
+// ============================================================
+window.abrirDevolucion = async repId => {
+  // Pedidos no entregados / cancelados de este repartidor
+  const pedidos = pedidosAll.filter(p =>
+    p.repartidorId === repId &&
+    (p.estado === 'noentregado' || p.estado === 'cancelado')
+  );
+
+  const lista = document.getElementById('devolucionLista');
+  if(!pedidos.length) {
+    lista.innerHTML = `<div style="text-align:center;color:var(--gris);
+      font-size:0.85rem;font-weight:600;padding:1rem;">
+      Sin productos a devolver</div>`;
+  } else {
+    lista.innerHTML = pedidos.map(p => {
+      const items = (p.items&&p.items.length)
+        ? p.items.map(it=>it.nombre+(it.cantidad>1?' x'+it.cantidad:'')).join(', ')
+        : (p.producto||'—');
+      return `<div style="padding:0.75rem;background:white;border:2px solid var(--border);
+               border-radius:var(--radius-sm);margin-bottom:0.6rem;">
+        <div style="font-weight:900;font-size:0.9rem;margin-bottom:0.3rem;">
+          ${p.nombre||'Sin nombre'} · $${p.totalFinal||0}
+        </div>
+        <div style="font-size:0.8rem;color:var(--gris);font-weight:600;margin-bottom:0.5rem;">
+          📦 ${items}
+        </div>
+        <div style="font-size:0.75rem;font-weight:800;margin-bottom:0.35rem;">Estado del producto devuelto:</div>
+        <div style="display:flex;gap:0.4rem;flex-wrap:wrap;">
+          <label style="display:flex;align-items:center;gap:0.3rem;font-size:0.78rem;font-weight:700;cursor:pointer;">
+            <input type="radio" name="dev_${p.id}" value="completo"> ✅ Completo y sin daños
+          </label>
+          <label style="display:flex;align-items:center;gap:0.3rem;font-size:0.78rem;font-weight:700;cursor:pointer;">
+            <input type="radio" name="dev_${p.id}" value="danado"> ⚠️ Con daño
+          </label>
+          <label style="display:flex;align-items:center;gap:0.3rem;font-size:0.78rem;font-weight:700;cursor:pointer;">
+            <input type="radio" name="dev_${p.id}" value="incompleto"> ❌ Incompleto
+          </label>
+        </div>
+        <input type="text" placeholder="Observaciones (opcional)…"
+               id="devObs_${p.id}" class="form-control"
+               style="margin-top:0.4rem;font-size:0.8rem;">
+        <input type="hidden" id="devPedId_${p.id}" value="${p.id}">
+      </div>`;
+    }).join('');
+  }
+
+  window._pedidosDevolucion = pedidos;
+  abrirModal('modalDevolucion');
+};
+
+window.finalizarDevolucion = async () => {
+  const pedidos = window._pedidosDevolucion || [];
+  if(!pedidos.length) { cerrarModal('modalDevolucion'); return; }
+
+  let reasignados = 0;
+  for(const p of pedidos) {
+    const estadoRadio = document.querySelector(`input[name="dev_${p.id}"]:checked`);
+    const estado      = estadoRadio?.value || 'completo';
+    const obs         = document.getElementById('devObs_'+p.id)?.value.trim() || '';
+
+    // Calcular siguiente día de entrega
+    const fechaOrig = p.fechaEntrega ? new Date(p.fechaEntrega+'T12:00:00') : new Date();
+    fechaOrig.setDate(fechaOrig.getDate()+1);
+    const nuevaFecha = fechaOrig.getFullYear()+'-'
+      +String(fechaOrig.getMonth()+1).padStart(2,'0')+'-'
+      +String(fechaOrig.getDate()).padStart(2,'0');
+
+    // Volver a Asignado, misma fecha+1, registrar devolución
+    await updateDoc(doc(db,'pedidos',p.id), {
+      estado:            'asignado',
+      fechaEntrega:      nuevaFecha,
+      devolucionEstado:  estado,
+      devolucionObs:     obs || null,
+      devueltoEn:        serverTimestamp(),
+      'historialEstados.reasignado_devolucion': serverTimestamp()
+    });
+    reasignados++;
+  }
+
+  cerrarModal('modalDevolucion');
+  mostrarToastAdmin(`✅ ${reasignados} pedido(s) reasignados para mañana`);
 };
 
 

@@ -145,10 +145,9 @@ select.form-control{
   transition:transform 0.15s;}
 .prod-card:active{transform:scale(0.97);}
 
-.prod-img{width:100%;aspect-ratio:1;object-fit:cover;background:var(--gris-light);
-  display:flex;align-items:center;justify-content:center;font-size:3rem;
-  max-height:200px;overflow:hidden;}
-.prod-img img{width:100%;height:100%;object-fit:contain;max-height:200px;background:white;}
+.prod-img{width:100%;height:180px;background:white;border-radius:12px 12px 0 0;
+  display:flex;align-items:center;justify-content:center;font-size:3rem;overflow:hidden;}
+.prod-img img{width:100%;height:180px;object-fit:contain;background:white;}
 
 .prod-body{padding:0.6rem 0.65rem 0.75rem;}
 .prod-nombre{font-size:0.82rem;font-weight:800;color:var(--gris-dark);margin-bottom:0.2rem;
@@ -699,6 +698,14 @@ async function cargarConfig() {
 // ============================================================
 // CATEGORÍAS
 // ============================================================
+function fotoDeCategoria(catId) {
+  const prod = productos.find(p =>
+    p.categoria === catId &&
+    (p.foto || (p.variantes && p.variantes[0]?.foto))
+  );
+  return prod ? (prod.foto || prod.variantes?.[0]?.foto || null) : null;
+}
+
 function renderCategorias() {
   const lista = document.getElementById('listaCats');
   if(!categorias.length) {
@@ -707,11 +714,24 @@ function renderCategorias() {
       Sin categorías aún</div>`;
     return;
   }
-  lista.innerHTML = categorias.map(c=>`
-    <div class="cat-card" onclick="verCategoria('${c.id}')">
-      <span class="cat-emoji">${c.emoji||'📦'}</span>
-      <span class="cat-nombre">${c.nombre}</span>
-    </div>`).join('');
+  lista.innerHTML = categorias.map(c => {
+    const foto  = fotoDeCategoria(c.id);
+    const emoji = c.emoji || '📦';
+    const imgHTML = foto
+      ? `<img src="${foto}" style="width:100%;height:100%;object-fit:cover;">`
+      : `<span style="font-size:2rem;">${emoji}</span>`;
+    return `
+    <div class="cat-card" onclick="verCategoria('${c.id}')"
+         style="padding:0;overflow:hidden;display:flex;flex-direction:column;">
+      <div style="height:90px;background:var(--gris-light);
+           display:flex;align-items:center;justify-content:center;overflow:hidden;">
+        ${imgHTML}
+      </div>
+      <span class="cat-nombre" style="padding:0.5rem 0.4rem;text-align:center;">
+        ${c.nombre}
+      </span>
+    </div>`;
+  }).join('');
 }
 
 window.verCategoria = catId => {
@@ -764,14 +784,21 @@ window.buscarProducto = () => {
     document.getElementById('secProductos').style.display  = catActual?'block':'none';
     return;
   }
-  const res = productos.filter(p =>
-    p.nombre.toLowerCase().includes(q) ||
-    (p.descripcion||'').toLowerCase().includes(q) ||
-    (p.variantes||[]).some(v=>(v.nombre||'').toLowerCase().includes(q))
-  );
+  // Búsqueda inteligente: palabras en cualquier orden
+  const palabras = q.split(' ').filter(Boolean);
+  const res = productos.filter(p => {
+    const texto = (
+      (p.nombre||'') + ' ' +
+      (p.descripcion||'') + ' ' +
+      (p.variantes||[]).map(v=>v.nombre||'').join(' ')
+    ).toLowerCase();
+    return palabras.every(pal => texto.includes(pal));
+  });
   document.getElementById('secCategorias').style.display = 'none';
   document.getElementById('secProductos').style.display  = 'none';
   document.getElementById('secBusqueda').style.display   = 'block';
+  const titulo = document.getElementById('catSelTitle');
+  if(titulo) titulo.textContent = res.length ? res.length+' resultado(s)' : 'Sin resultados';
   renderProductos(res, 'listaBusqueda');
 };
 

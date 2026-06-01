@@ -179,6 +179,22 @@ button{cursor:pointer;font-family:var(--font);}
 
 <!-- APP REPARTIDOR -->
 <div id="appRep">
+  <!-- BANNER: Confirmar recepción de productos -->
+  <div id="bannerConfirmar" style="display:none;background:#F39C12;color:white;
+       padding:0.65rem 1.25rem;font-size:0.82rem;font-weight:800;
+       display:none;align-items:center;justify-content:space-between;gap:0.5rem;">
+    <span>📦 Supervisor confirmó entrega. Ingresa el código:</span>
+    <div style="display:flex;gap:0.4rem;align-items:center;">
+      <input type="text" id="repCodigoInput" maxlength="4"
+             style="width:70px;padding:0.3rem;border-radius:6px;border:none;
+                    text-align:center;font-size:1.1rem;font-weight:900;"
+             placeholder="0000">
+      <button onclick="repConfirmarRecepcion()"
+              style="background:white;color:#F39C12;border:none;border-radius:6px;
+                     padding:0.3rem 0.6rem;font-weight:900;cursor:pointer;">OK</button>
+    </div>
+  </div>
+
   <header class="header">
     <div class="header-left">
       <h2 id="repNombre">Mis Pedidos</h2>
@@ -340,6 +356,7 @@ function iniciarApp() {
 
   // Suscribir pedidos
   suscribirPedidos();
+  setTimeout(verificarEntregaPendiente, 1500);
 }
 
 // ============================================================
@@ -456,6 +473,44 @@ window.moverRuta = (idx, dir) => {
 // ============================================================
 // ACCIONES DEL PEDIDO
 // ============================================================
+// Verificar si hay entrega pendiente de confirmar
+async function verificarEntregaPendiente() {
+  const d   = new Date();
+  const hoy = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  try {
+    const snap = await getDoc(doc(db,'entregasDia',repartidorId+'_'+hoy));
+    if(snap.exists() && snap.data().supervisorConfirmo && !snap.data().repConfirmo) {
+      document.getElementById('bannerConfirmar').style.display = 'flex';
+      window._entregaDiaId = repartidorId+'_'+hoy;
+    }
+  } catch(e) { console.log('Sin entrega del día:', e.message); }
+}
+
+window.repConfirmarRecepcion = async () => {
+  const codigo = document.getElementById('repCodigoInput').value.trim();
+  if(!codigo || codigo.length !== 4) { alert('Ingresa el código de 4 dígitos.'); return; }
+
+  try {
+    const snap = await getDoc(doc(db,'entregasDia',window._entregaDiaId));
+    if(!snap.exists()) { alert('No se encontró la entrega.'); return; }
+
+    if(snap.data().codigoConfirmacion !== codigo) {
+      alert('Código incorrecto. Verifica con el supervisor.'); return;
+    }
+
+    // Confirmar recepción
+    await updateDoc(doc(db,'entregasDia',window._entregaDiaId), {
+      repConfirmo:    true,
+      repConfirmoEn:  serverTimestamp()
+    });
+
+    document.getElementById('bannerConfirmar').style.display = 'none';
+    alert('✅ Productos recibidos confirmados. ¡Listo para iniciar el reparto!');
+  } catch(e) {
+    alert('Error: ' + e.message);
+  }
+};
+
 window.marcarEntregado = async id => {
   if(!confirm('¿Confirmas que el pedido fue entregado?')) return;
 
