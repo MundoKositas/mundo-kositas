@@ -306,8 +306,17 @@ select.form-control{
 
       <!-- Catálogo -->
       <div id="pagCatalogo" class="page">
-        <button class="btn btn-rojo" style="margin-bottom:1rem;"
-                onclick="abrirModalProducto()">+ Agregar Producto</button>
+        <div style="display:flex;gap:0.5rem;margin-bottom:1rem;flex-wrap:wrap;">
+          <button class="btn btn-rojo" style="flex:1;" onclick="abrirModalProducto()">
+            + Agregar Producto
+          </button>
+          <button onclick="migrarCategoriasManual()"
+                  style="background:var(--azul);color:white;padding:0.75rem 1rem;border:none;
+                         border-radius:var(--radius-sm);font-weight:800;font-family:var(--font);
+                         cursor:pointer;font-size:0.82rem;white-space:nowrap;">
+            🔄 Reparar categorías
+          </button>
+        </div>
         <div id="listaProductos"><div class="loading">Cargando…</div></div>
       </div>
 
@@ -2271,6 +2280,59 @@ window.guardarProducto = async () => {
 
 window.toggleVisible = async (id, visible) => {
   await updateDoc(doc(db,'productos',id), { visible: !visible });
+};
+
+window.migrarCategoriasManual = async () => {
+  if(!confirm('¿Intentar reparar categorías automáticamente? Esto actualizará los productos sin categoría.')) return;
+
+  // Mapeo de valores comunes a nombres de categorías en Firebase
+  const MAPEOS = {
+    'shampoo':'personal', 'cuidado':'personal', 'personal':'personal',
+    'hogar':'hogar', 'limpieza':'limpieza', 'regalo':'regalo',
+    'ventilador':'ventilador', 'ventiladores':'ventilador',
+    'electronica':'electr', 'electronico':'electr', 'electr':'electr',
+    'iluminacion':'iluminac', 'iluminación':'iluminac', 'luz':'iluminac', 'foco':'iluminac',
+    'plomeria':'plomer', 'plomería':'plomer', 'computo':'comput', 'cómputo':'comput',
+    'solar':'solar', 'otro':'otro'
+  };
+
+  let migrados = 0;
+  for(const p of productosAll) {
+    // Si ya tiene categoría válida, saltar
+    if(categoriasAll.find(c=>c.id===p.categoria)) continue;
+
+    const valViejo = (p.categoria||'').toLowerCase().trim();
+    let catDestino = null;
+
+    // Buscar por mapeo
+    for(const [clave, fragmento] of Object.entries(MAPEOS)) {
+      if(valViejo.includes(clave)) {
+        catDestino = categoriasAll.find(c=>(c.nombre||'').toLowerCase().includes(fragmento));
+        if(catDestino) break;
+      }
+    }
+
+    // Si no encontró, intentar coincidencia directa en nombre
+    if(!catDestino) {
+      catDestino = categoriasAll.find(c=>
+        (c.nombre||'').toLowerCase().includes(valViejo) ||
+        valViejo.includes((c.nombre||'').toLowerCase())
+      );
+    }
+
+    if(catDestino) {
+      try {
+        await updateDoc(doc(db,'productos',p.id), { categoria: catDestino.id });
+        migrados++;
+      } catch(e) { console.warn('Error:', e.message); }
+    }
+  }
+
+  if(migrados > 0) {
+    mostrarToastAdmin('✅ '+migrados+' producto(s) reparados');
+  } else {
+    alert('No se encontraron productos para reparar. Los que dicen "Sin categoría" necesitan asignarse manualmente.');
+  }
 };
 
 window.filtrarProductosAdmin = () => {
