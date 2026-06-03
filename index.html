@@ -2073,25 +2073,26 @@ function renderProductos() {
     const barra = document.createElement('div');
     barra.id = 'adminProdFiltros';
     barra.style.cssText = 'margin-bottom:0.75rem;display:flex;flex-direction:column;gap:0.5rem;';
-    barra.innerHTML = `
-      <input type="text" id="adminProdBusq" class="form-control"
-             placeholder="🔍 Buscar producto…" oninput="filtrarProductosAdmin()"
-             style="border-radius:999px;">
-      <div id="adminCatFiltros" style="display:flex;flex-wrap:wrap;gap:0.35rem;">
-        <button onclick="filtrarCatAdmin('')"
-                class="btn-sm" id="catAll"
-                style="background:var(--rojo);color:white;border-radius:999px;
-                       padding:0.3rem 0.85rem;border:none;font-size:0.75rem;font-weight:800;">
-          Todos
-        </button>
-        ${categoriasAll.map(c=>`
-          <button onclick="filtrarCatAdmin('${c.id}')"
-                  id="catF_${c.id}"
-                  style="background:var(--gris-light);border-radius:999px;border:none;
-                         padding:0.3rem 0.85rem;font-size:0.75rem;font-weight:800;cursor:pointer;">
-            ${c.emoji||''} ${c.nombre}
-          </button>`).join('')}
-      </div>`;
+    const botonesCat = categoriasAll.map(c=>
+      '<button onclick="filtrarCatAdmin(\'' + c.id + '\')"'
+      + ' id="catF_' + c.id + '"'
+      + ' style="background:var(--gris-light);border-radius:999px;border:none;'
+      + 'padding:0.3rem 0.85rem;font-size:0.75rem;font-weight:800;cursor:pointer;">'
+      + (c.emoji||'') + ' ' + c.nombre
+      + '</button>'
+    ).join('');
+
+    barra.innerHTML =
+      '<input type="text" id="adminProdBusq" class="form-control"'
+      + ' placeholder="🔍 Buscar producto…" oninput="filtrarProductosAdmin()"'
+      + ' style="border-radius:999px;">'
+      + '<div id="adminCatFiltros" style="display:flex;flex-wrap:wrap;gap:0.35rem;">'
+      + '<button onclick="filtrarCatAdmin(\'\')" id="catAll"'
+      + ' style="background:var(--rojo);color:white;border-radius:999px;'
+      + 'padding:0.3rem 0.85rem;border:none;font-size:0.75rem;font-weight:800;">'
+      + 'Todos</button>'
+      + botonesCat
+      + '</div>';
     lista.parentNode.insertBefore(barra, lista);
   }
 
