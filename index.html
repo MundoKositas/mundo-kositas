@@ -1242,33 +1242,44 @@ document.getElementById('loginPassword')
 // AUTH STATE
 // ============================================================
 onAuthStateChanged(auth, async user => {
-  const token = new URLSearchParams(location.search).get('token');
-  if (!user) {
-    if (token) {
-      // Repartidor con link mágico: login anónimo automático
-      try { await signInAnonymously(auth); } catch(e) { alerta('Error de acceso.'); }
-    } else {
-      mostrarLogin();
+  try {
+    const token = new URLSearchParams(location.search).get('token');
+    if (!user) {
+      if (token) {
+        try { await signInAnonymously(auth); } catch(e) { alerta('Error de acceso.'); }
+      } else {
+        mostrarLogin();
+      }
+      return;
     }
-    return;
+    if (token) { await validarToken(token); }
+    else       { await iniciarAdmin(user); }
+  } catch(e) {
+    console.error('ERROR en onAuthStateChanged:', e);
+    alert('Error al cargar la app:\n' + e.message + '\n\nRevisa la consola del navegador (F12).');
+    document.getElementById('loginBtn').textContent = 'Entrar';
+    mostrarLogin();
   }
-  if (token) { await validarToken(token); }
-  else       { await iniciarAdmin(user); }
 });
 
 async function iniciarAdmin(user) {
-  const snap = await getDocs(query(collection(db,'usuarios'), where('uid','==',user.uid)));
-  if (snap.empty) {
-    await addDoc(collection(db,'usuarios'), {
-      uid: user.uid, email: user.email, nombre:'Administrador',
-      rol:'admin', activo:true, creadoEn: serverTimestamp()
-    });
-    rolActual = 'admin';
-    iniciarApp({ nombre:'Administrador', rol:'admin' });
-  } else {
-    const d = snap.docs[0].data();
-    rolActual = d.rol;
-    iniciarApp(d);
+  try {
+    const snap = await getDocs(query(collection(db,'usuarios'), where('uid','==',user.uid)));
+    if (snap.empty) {
+      await addDoc(collection(db,'usuarios'), {
+        uid: user.uid, email: user.email, nombre:'Administrador',
+        rol:'admin', activo:true, creadoEn: serverTimestamp()
+      });
+      rolActual = 'admin';
+      iniciarApp({ nombre:'Administrador', rol:'admin' });
+    } else {
+      const d = snap.docs[0].data();
+      rolActual = d.rol;
+      iniciarApp(d);
+    }
+  } catch(e) {
+    console.error('ERROR en iniciarAdmin:', e);
+    throw e; // propagar para que lo atrape el handler superior
   }
 }
 
