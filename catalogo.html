@@ -133,8 +133,9 @@ select.form-control{
 .cat-card:active{transform:scale(0.95);}
 .cat-card.selected{border-color:var(--rojo);background:var(--rojo-light);}
 .cat-emoji{font-size:1.75rem;display:block;margin-bottom:0.3rem;}
-.cat-nombre{font-size:0.65rem;font-weight:800;color:var(--gris-dark);line-height:1.2;text-align:center;}
-@media(min-width:900px){.cat-nombre{font-size:0.6rem;}}
+.cat-nombre{font-size:0.75rem;font-weight:900;color:var(--gris-dark);line-height:1.2;text-align:center;
+  padding:0.5rem 0.4rem;letter-spacing:0.03em;}
+@media(min-width:900px){.cat-nombre{font-size:0.7rem;}}
 .cat-card.selected .cat-nombre{color:var(--rojo);}
 
 /* ===========================
@@ -754,9 +755,11 @@ function renderCategorias() {
            border-radius:12px 12px 0 0;">
         ${imgHTML}
       </div>
-      <span class="cat-nombre" style="padding:0.5rem 0.4rem;text-align:center;">
-        ${c.nombre}
-      </span>
+      <div style="background:var(--rojo);border-radius:0 0 12px 12px;padding:0.4rem 0.3rem;text-align:center;">
+        <span style="font-size:0.68rem;font-weight:900;color:white;letter-spacing:0.04em;line-height:1.2;">
+          ${c.nombre}
+        </span>
+      </div>
     </div>`;
   }).join('');
 }
