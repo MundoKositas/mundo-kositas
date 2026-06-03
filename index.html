@@ -1323,10 +1323,13 @@ function iniciarApp(datos) {
     if(btnUsr) btnUsr.style.display = rolActual==='admin' ? 'flex' : 'none';
     // Registrar último acceso del supervisor (async, sin await aquí)
     if(rolActual==='supervisor') {
-      getDocs(query(collection(db,'usuarios'), where('uid','==',user.uid)))
+      getDocs(query(collection(db,'usuarios'), where('rol','==','supervisor')))
         .then(snapU => {
-          if(!snapU.empty) {
-            updateDoc(doc(db,'usuarios',snapU.docs[0].id), {
+          const authUser = auth.currentUser;
+          if(!authUser) return;
+          const docSup = snapU.docs.find(d=>d.data().uid===authUser.uid);
+          if(docSup) {
+            updateDoc(doc(db,'usuarios',docSup.id), {
               ultimoAcceso: serverTimestamp()
             });
           }
@@ -2067,6 +2070,7 @@ let filtroTextoAdmin = ''; // búsqueda activa en admin
 
 function renderProductos() {
   const lista = document.getElementById('listaProductos');
+  if(!lista) return; // seguridad: si el DOM no está listo, salir
 
   // Barra de filtros si no existe
   if(!document.getElementById('adminProdFiltros')) {
