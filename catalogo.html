@@ -124,13 +124,17 @@ select.form-control{
   text-transform:uppercase;letter-spacing:0.07em;margin:0.75rem 0 0.5rem;}
 
 .cats-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:0.6rem;margin-bottom:1rem;}
+@media(min-width:600px){.cats-grid{grid-template-columns:repeat(4,1fr);gap:0.75rem;}}
+@media(min-width:900px){.cats-grid{grid-template-columns:repeat(6,1fr);gap:0.75rem;}}
+@media(min-width:1200px){.cats-grid{grid-template-columns:repeat(7,1fr);gap:0.75rem;}}
 .cat-card{background:var(--blanco);border-radius:var(--radius);padding:0;
   text-align:center;box-shadow:var(--shadow);cursor:pointer;
   transition:transform 0.15s,box-shadow 0.15s;border:2px solid transparent;}
 .cat-card:active{transform:scale(0.95);}
 .cat-card.selected{border-color:var(--rojo);background:var(--rojo-light);}
 .cat-emoji{font-size:1.75rem;display:block;margin-bottom:0.3rem;}
-.cat-nombre{font-size:0.72rem;font-weight:800;color:var(--gris-dark);line-height:1.2;}
+.cat-nombre{font-size:0.65rem;font-weight:800;color:var(--gris-dark);line-height:1.2;text-align:center;}
+@media(min-width:900px){.cat-nombre{font-size:0.6rem;}}
 .cat-card.selected .cat-nombre{color:var(--rojo);}
 
 /* ===========================
@@ -138,8 +142,9 @@ select.form-control{
 =========================== */
 .prods-grid{display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;}
 @media(min-width:600px){.prods-grid{grid-template-columns:repeat(3,1fr);}}
-@media(min-width:900px){.prods-grid{grid-template-columns:repeat(4,1fr);max-width:1100px;}}
+@media(min-width:900px){.prods-grid{grid-template-columns:repeat(4,1fr);}}
 @media(min-width:1200px){.prods-grid{grid-template-columns:repeat(5,1fr);}}
+@media(min-width:1400px){.prods-grid{grid-template-columns:repeat(6,1fr);}}
 
 .prod-card{background:var(--blanco);border-radius:var(--radius);
   box-shadow:var(--shadow);overflow:hidden;cursor:pointer;
@@ -744,7 +749,7 @@ function renderCategorias() {
     return `
     <div class="cat-card" onclick="verCategoria('${c.id}')"
          style="padding:0;overflow:hidden;display:flex;flex-direction:column;">
-      <div style="width:100%;aspect-ratio:1/1;background:#f8f8f8;
+      <div style="width:100%;aspect-ratio:1/1;max-height:160px;background:#f8f8f8;
            display:flex;align-items:center;justify-content:center;overflow:hidden;
            border-radius:12px 12px 0 0;">
         ${imgHTML}
