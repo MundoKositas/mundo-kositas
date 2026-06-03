@@ -2299,56 +2299,58 @@ window.toggleVisible = async (id, visible) => {
 };
 
 window.migrarCategoriasManual = async () => {
-  if(!confirm('¿Intentar reparar categorías automáticamente? Esto actualizará los productos sin categoría.')) return;
+  // Contar cuántos necesitan reparación
+  const sinCat = productosAll.filter(p => !categoriasAll.find(c=>c.id===p.categoria));
+  if(!sinCat.length) {
+    mostrarToastAdmin('✅ Todas las categorías ya están correctas');
+    return;
+  }
 
-  // Mapeo de valores comunes a nombres de categorías en Firebase
-  const MAPEOS = {
-    'shampoo':'personal', 'cuidado':'personal', 'personal':'personal',
-    'hogar':'hogar', 'limpieza':'limpieza', 'regalo':'regalo',
-    'ventilador':'ventilador', 'ventiladores':'ventilador',
-    'electronica':'electr', 'electronico':'electr', 'electr':'electr',
-    'iluminacion':'iluminac', 'iluminación':'iluminac', 'luz':'iluminac', 'foco':'iluminac',
-    'plomeria':'plomer', 'plomería':'plomer', 'computo':'comput', 'cómputo':'comput',
-    'solar':'solar', 'otro':'otro'
-  };
+  if(!confirm('Se reasignarán las categorías de '+sinCat.length+' producto(s). ¿Continuar?')) return;
 
   let migrados = 0;
+  let sinResolver = 0;
+
   for(const p of productosAll) {
-    // Si ya tiene categoría válida, saltar
+    // Si ya tiene ID válido en Firebase, saltar
     if(categoriasAll.find(c=>c.id===p.categoria)) continue;
 
-    const valViejo = (p.categoria||'').toLowerCase().trim();
-    let catDestino = null;
+    // Intentar encontrar la categoría correcta por cualquier método
+    const catId = encontrarCategoria(p.categoria);
 
-    // Buscar por mapeo
-    for(const [clave, fragmento] of Object.entries(MAPEOS)) {
-      if(valViejo.includes(clave)) {
-        catDestino = categoriasAll.find(c=>(c.nombre||'').toLowerCase().includes(fragmento));
-        if(catDestino) break;
+    if(catId) {
+      try {
+        await updateDoc(doc(db,'productos',p.id), { categoria: catId });
+        migrados++;
+      } catch(e) { console.warn('Error actualizando', p.nombre, e.message); }
+    } else {
+      // Último recurso: si solo hay una categoría, asignar la primera
+      // O buscar por texto en nombre del producto vs nombre de categoría
+      let catGuess = null;
+      const nomProd = (p.nombre||'').toLowerCase();
+      for(const cat of categoriasAll) {
+        const nomCat = (cat.nombre||'').toLowerCase();
+        if(nomProd.includes(nomCat) || nomCat.split(' ').some(w=>w.length>3&&nomProd.includes(w))) {
+          catGuess = cat;
+          break;
+        }
+      }
+      if(catGuess) {
+        try {
+          await updateDoc(doc(db,'productos',p.id), { categoria: catGuess.id });
+          migrados++;
+        } catch(e) { console.warn('Error:', e.message); }
+      } else {
+        sinResolver++;
+        console.warn('Sin categoría para:', p.nombre, '(categoria guardada:', p.categoria, ')');
       }
     }
-
-    // Si no encontró, intentar coincidencia directa en nombre
-    if(!catDestino) {
-      catDestino = categoriasAll.find(c=>
-        (c.nombre||'').toLowerCase().includes(valViejo) ||
-        valViejo.includes((c.nombre||'').toLowerCase())
-      );
-    }
-
-    if(catDestino) {
-      try {
-        await updateDoc(doc(db,'productos',p.id), { categoria: catDestino.id });
-        migrados++;
-      } catch(e) { console.warn('Error:', e.message); }
-    }
   }
 
-  if(migrados > 0) {
-    mostrarToastAdmin('✅ '+migrados+' producto(s) reparados');
-  } else {
-    alert('No se encontraron productos para reparar. Los que dicen "Sin categoría" necesitan asignarse manualmente.');
-  }
+  let msg = '✅ '+migrados+' producto(s) reparados.';
+  if(sinResolver) msg += ' '+sinResolver+' no se pudieron asignar — edítalos manualmente.';
+  mostrarToastAdmin(msg);
+  if(sinResolver) alert(msg + '\n\nAbre esos productos, selecciona su categoría y da Guardar Producto.');
 };
 
 window.filtrarProductosAdmin = () => {
