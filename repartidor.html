@@ -604,31 +604,46 @@ window.voyEnCamino = async (pedidoId) => {
   let minutosEstimados = null;
   let posRepartidor    = null;
 
+  // PASO 1: Obtener GPS del repartidor
   try {
     posRepartidor = await new Promise((res, rej) =>
       navigator.geolocation.getCurrentPosition(res, rej, {
-        enableHighAccuracy: true, timeout: 8000
+        enableHighAccuracy: true, timeout: 10000
       })
     );
+    console.log('GPS repartidor:', posRepartidor.coords.latitude, posRepartidor.coords.longitude);
   } catch(e) {
-    console.warn('GPS no disponible:', e.message);
+    console.warn('GPS denegado o no disponible:', e.message);
+    // Sin GPS no podemos calcular tiempo — continuar sin estimación
   }
 
-  // Geocodificar la dirección del pedido (OpenStreetMap - gratis, sin API key)
+  // PASO 2: Geocodificar dirección del cliente
   if(posRepartidor) {
     try {
-      const dir = encodeURIComponent(
-        (pedido.domicilio||'') + ', ' +
-        (pedido.colonia||'') + ', Durango, México'
-      );
-      const geoResp = await fetch(
-        'https://nominatim.openstreetmap.org/search?format=json&limit=1&q=' + dir,
-        { headers: { 'Accept-Language': 'es' } }
-      );
-      const geoData = await geoResp.json();
-      if(geoData.length > 0) {
-        const lat2 = parseFloat(geoData[0].lat);
-        const lng2 = parseFloat(geoData[0].lon);
+      // Intentar primero con dirección completa, luego solo colonia si falla
+      const intentos = [
+        (pedido.domicilio||'') + ', ' + (pedido.colonia||'') + ', Durango, Dgo, México',
+        (pedido.colonia||'') + ', Durango, Dgo, México',
+        'Durango, Dgo, México'  // fallback: centro de Durango
+      ];
+
+      let lat2 = null, lng2 = null;
+
+      for(const dirIntento of intentos) {
+        const url = 'https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=mx&q='
+                  + encodeURIComponent(dirIntento);
+        console.log('Geocodificando:', dirIntento);
+        const resp    = await fetch(url, { headers: {'Accept-Language':'es', 'User-Agent':'MundoKositas/1.0'} });
+        const datos   = await resp.json();
+        if(datos.length > 0) {
+          lat2 = parseFloat(datos[0].lat);
+          lng2 = parseFloat(datos[0].lon);
+          console.log('Encontrado:', datos[0].display_name, '→', lat2, lng2);
+          break;
+        }
+      }
+
+      if(lat2 && lng2) {
         const R    = 6371;
         const dLat = (lat2 - posRepartidor.coords.latitude)  * Math.PI/180;
         const dLng = (lng2 - posRepartidor.coords.longitude) * Math.PI/180;
@@ -637,11 +652,11 @@ window.voyEnCamino = async (pedidoId) => {
                    * Math.cos(lat2*Math.PI/180)
                    * Math.sin(dLng/2)**2;
         const dist = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-        // Velocidad promedio urbana Durango: 25 km/h, ×1.4 por calles reales
         minutosEstimados = Math.max(3, Math.round((dist * 1.4 / 25) * 60));
+        console.log('Distancia:', dist.toFixed(2), 'km → ~', minutosEstimados, 'min');
       }
     } catch(eGeo) {
-      console.warn('Geocodificación no disponible:', eGeo.message);
+      console.warn('Error geocodificando:', eGeo.message);
     }
   }
 
