@@ -614,19 +614,35 @@ window.voyEnCamino = async (pedidoId) => {
     console.warn('GPS no disponible:', e.message);
   }
 
-  // Calcular distancia y tiempo estimado si tenemos coordenadas del pedido
-  if(posRepartidor && pedido.lat && pedido.lng) {
-    const R    = 6371; // km
-    const dLat = (pedido.lat - posRepartidor.coords.latitude)  * Math.PI/180;
-    const dLng = (pedido.lng - posRepartidor.coords.longitude) * Math.PI/180;
-    const a    = Math.sin(dLat/2)**2
-               + Math.cos(posRepartidor.coords.latitude*Math.PI/180)
-               * Math.cos(pedido.lat*Math.PI/180)
-               * Math.sin(dLng/2)**2;
-    const dist = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); // km en línea recta
-    // Velocidad promedio urbana Durango: 25 km/h, x1.4 por rodeo de calles
-    const tiempoMin = Math.round((dist * 1.4 / 25) * 60);
-    minutosEstimados = Math.max(3, tiempoMin); // mínimo 3 minutos
+  // Geocodificar la dirección del pedido (OpenStreetMap - gratis, sin API key)
+  if(posRepartidor) {
+    try {
+      const dir = encodeURIComponent(
+        (pedido.domicilio||'') + ', ' +
+        (pedido.colonia||'') + ', Durango, México'
+      );
+      const geoResp = await fetch(
+        'https://nominatim.openstreetmap.org/search?format=json&limit=1&q=' + dir,
+        { headers: { 'Accept-Language': 'es' } }
+      );
+      const geoData = await geoResp.json();
+      if(geoData.length > 0) {
+        const lat2 = parseFloat(geoData[0].lat);
+        const lng2 = parseFloat(geoData[0].lon);
+        const R    = 6371;
+        const dLat = (lat2 - posRepartidor.coords.latitude)  * Math.PI/180;
+        const dLng = (lng2 - posRepartidor.coords.longitude) * Math.PI/180;
+        const a    = Math.sin(dLat/2)**2
+                   + Math.cos(posRepartidor.coords.latitude*Math.PI/180)
+                   * Math.cos(lat2*Math.PI/180)
+                   * Math.sin(dLng/2)**2;
+        const dist = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        // Velocidad promedio urbana Durango: 25 km/h, ×1.4 por calles reales
+        minutosEstimados = Math.max(3, Math.round((dist * 1.4 / 25) * 60));
+      }
+    } catch(eGeo) {
+      console.warn('Geocodificación no disponible:', eGeo.message);
+    }
   }
 
   // Construir mensaje desde configuración (con fallback)
