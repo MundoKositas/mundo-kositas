@@ -1570,6 +1570,12 @@ window.verPedido = pedidoId => {
   else if(p.estado==='noentregado')
     acciones=`<button class="btn-sm btn-sm-naranja" onclick="abrirReasignarPedido('${p.id}')">🔄 Reasignar</button>
               <button class="btn-sm btn-sm-rojo"    onclick="cambiarEstado('${p.id}','cancelado')">❌ Cancelar</button>`;
+  else if(p.estado==='entregado')
+    acciones=`<button class="btn-sm btn-sm-naranja" onclick="revertirEntregado('${p.id}')">↩️ Revertir a pendiente</button>`;
+
+  // Botón repetir pedido — disponible en cualquier estado
+  acciones += `<button class="btn-sm" onclick="repetirPedido('${p.id}')"
+    style="background:var(--azul);color:white;">🔁 Repetir pedido</button>`;
 
   const wa = p.telefono ? waButtons(p) : '';
 
@@ -1660,6 +1666,54 @@ function waButtons(p) {
 // ============================================================
 // CAMBIAR ESTADO
 // ============================================================
+window.revertirEntregado = async id => {
+  if(!confirm('¿Revertir este pedido a "Asignado" (pendiente de entrega)?')) return;
+  await updateDoc(doc(db,'pedidos',id), {
+    estado:           'asignado',
+    fechaEntregaReal:  null,
+    'historialEstados.revertido': serverTimestamp()
+  });
+  mostrarToastAdmin('✅ Pedido revertido a Asignado');
+  cerrarModal('modalPedido');
+};
+
+window.repetirPedido = id => {
+  const p = pedidosAll.find(x=>x.id===id);
+  if(!p) return;
+  cerrarModal('modalPedido');
+
+  // Pre-llenar el formulario de nuevo pedido con los datos del anterior
+  abrirModalNuevoPedido();
+
+  setTimeout(() => {
+    // Datos del cliente
+    document.getElementById('npNombre').value   = p.nombre    || '';
+    document.getElementById('npTelefono').value = p.telefono  || '';
+    document.getElementById('npDomicilio').value= p.domicilio || '';
+    document.getElementById('npColonia').value  = p.colonia   || '';
+    document.getElementById('npMetodoPago').value = p.metodoPago || 'efectivo';
+    document.getElementById('npNotas').value    = p.notas     || '';
+    document.getElementById('npEnvio').value    = p.costoEnvio || 35;
+
+    // Fecha: mañana por defecto
+    const manana = new Date();
+    manana.setDate(manana.getDate()+1);
+    document.getElementById('npFechaEntrega').value =
+      manana.getFullYear()+'-'+String(manana.getMonth()+1).padStart(2,'0')+'-'+String(manana.getDate()).padStart(2,'0');
+
+    // Copiar items del pedido anterior
+    if(p.items && p.items.length) {
+      npItems = p.items.map(it=>({...it}));
+    } else if(p.producto) {
+      // Pedido antiguo sin items — crear uno con el texto del producto
+      npItems = [{ nombre:p.producto, precio:p.unidad||p.totalFinal||0, cantidad:1, subtotal:p.unidad||p.totalFinal||0 }];
+    }
+    renderItemsManual();
+
+    mostrarToastAdmin('📋 Datos del pedido anterior copiados — revisa y guarda');
+  }, 200);
+};
+
 window.cambiarEstado = async (id, estado) => {
   const datos = { estado, [`historialEstados.${estado}`]: serverTimestamp() };
   if(estado==='entregado') datos.fechaEntregaReal = serverTimestamp();
