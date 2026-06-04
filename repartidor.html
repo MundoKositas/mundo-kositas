@@ -629,12 +629,16 @@ window.voyEnCamino = async (pedidoId) => {
 
       let lat2 = null, lng2 = null;
 
+      // Bounding box de Durango (solo resultados dentro de la ciudad)
+      // Norte:24.15 Sur:23.95 Oeste:-104.75 Este:-104.55
+      const bbox = '&viewbox=-104.75,24.15,-104.55,23.95&bounded=1';
+
       for(const dirIntento of intentos) {
-        const url = 'https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=mx&q='
-                  + encodeURIComponent(dirIntento);
+        const url = 'https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=mx'
+                  + bbox + '&q=' + encodeURIComponent(dirIntento);
         console.log('Geocodificando:', dirIntento);
-        const resp    = await fetch(url, { headers: {'Accept-Language':'es', 'User-Agent':'MundoKositas/1.0'} });
-        const datos   = await resp.json();
+        const resp  = await fetch(url, { headers: {'Accept-Language':'es','User-Agent':'MundoKositas/1.0'} });
+        const datos = await resp.json();
         if(datos.length > 0) {
           lat2 = parseFloat(datos[0].lat);
           lng2 = parseFloat(datos[0].lon);
@@ -652,8 +656,14 @@ window.voyEnCamino = async (pedidoId) => {
                    * Math.cos(lat2*Math.PI/180)
                    * Math.sin(dLng/2)**2;
         const dist = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-        minutosEstimados = Math.max(3, Math.round((dist * 1.4 / 25) * 60));
-        console.log('Distancia:', dist.toFixed(2), 'km → ~', minutosEstimados, 'min');
+
+        // Velocidad calibrada para Durango: 40 km/h, factor de calles reales 1.3
+        const minCalc = Math.round((dist * 1.3 / 40) * 60);
+
+        // Sanidad: si da más de 60 min dentro de Durango es error de geocodificación
+        minutosEstimados = (minCalc <= 60) ? Math.max(2, minCalc) : null;
+        console.log('Distancia:', dist.toFixed(2), 'km → ~', minCalc, 'min',
+          minutosEstimados ? '✅' : '⚠️ descartado (fuera de rango)');
       }
     } catch(eGeo) {
       console.warn('Error geocodificando:', eGeo.message);
