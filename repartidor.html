@@ -458,6 +458,10 @@ function renderPedidos() {
         <button class="btn-sm btn-rojo"  onclick="abrirNoEntregado('${p.id}')">⚠️ No entregado</button>
         <a href="https://maps.google.com/?q=${mapsQ}"
            target="_blank" class="btn-sm btn-azul">🗺️ Mapa</a>
+        ${p.telefono
+          ? `<button class="btn-sm" onclick="voyEnCamino('${p.id}')"
+               style="background:#25D366;color:white;">🚀 Voy en camino</button>`
+          : ''}
       </div>
     </div>`;
   }).join('');
@@ -584,6 +588,78 @@ window.confirmarNoEntregado = async () => {
 
 window.cerrarModal = () => {
   document.getElementById('modalNoEnt').classList.remove('open');
+};
+
+// ============================================================
+// VOY EN CAMINO — GPS + estimación de tiempo + WhatsApp
+// ============================================================
+window.voyEnCamino = async (pedidoId) => {
+  const pedido = pedidosRep.find(p=>p.id===pedidoId) || rutaOrden.find(p=>p.id===pedidoId);
+  if(!pedido) return;
+
+  const btn = document.querySelector(`button[onclick="voyEnCamino('${pedidoId}')"]`);
+  if(btn) { btn.textContent = '📍 Obteniendo ubicación…'; btn.disabled = true; }
+
+  // Obtener ubicación GPS actual
+  let minutosEstimados = null;
+  let posRepartidor    = null;
+
+  try {
+    posRepartidor = await new Promise((res, rej) =>
+      navigator.geolocation.getCurrentPosition(res, rej, {
+        enableHighAccuracy: true, timeout: 8000
+      })
+    );
+  } catch(e) {
+    console.warn('GPS no disponible:', e.message);
+  }
+
+  // Calcular distancia y tiempo estimado si tenemos coordenadas del pedido
+  if(posRepartidor && pedido.lat && pedido.lng) {
+    const R    = 6371; // km
+    const dLat = (pedido.lat - posRepartidor.coords.latitude)  * Math.PI/180;
+    const dLng = (pedido.lng - posRepartidor.coords.longitude) * Math.PI/180;
+    const a    = Math.sin(dLat/2)**2
+               + Math.cos(posRepartidor.coords.latitude*Math.PI/180)
+               * Math.cos(pedido.lat*Math.PI/180)
+               * Math.sin(dLng/2)**2;
+    const dist = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); // km en línea recta
+    // Velocidad promedio urbana Durango: 25 km/h, x1.4 por rodeo de calles
+    const tiempoMin = Math.round((dist * 1.4 / 25) * 60);
+    minutosEstimados = Math.max(3, tiempoMin); // mínimo 3 minutos
+  }
+
+  // Construir mensaje desde configuración (con fallback)
+  let template = '🏠 Hola [Nombre], soy el repartidor de Mundo Kositas 🛵\nSigue su pedido: [Productos]\nTotal a pagar: $[Total]\n\nEstoy en camino, llego aproximadamente en [Minutos] minutos 📍\n¡Favor de estar al pendiente! 😊';
+
+  try {
+    // Intentar cargar mensaje configurado
+    const snap = await getDocs(collection(db,'config'));
+    if(!snap.empty) {
+      const cfg = snap.docs[0].data();
+      if(cfg.mensajes?.voyEnCamino) template = cfg.mensajes.voyEnCamino;
+    }
+  } catch(e) { /* usar fallback */ }
+
+  // Construir texto del mensaje
+  const nombre   = pedido.nombre || '';
+  const productos= (pedido.items&&pedido.items.length)
+    ? pedido.items.map(it=>it.nombre+(it.cantidad>1?' x'+it.cantidad:'')).join(', ')
+    : (pedido.producto||'');
+  const total    = (pedido.totalFinal||0).toLocaleString('es-MX');
+  const minutos  = minutosEstimados ? String(minutosEstimados) : '??';
+
+  const mensaje = template
+    .replace(/\[Nombre\]/gi,   nombre)
+    .replace(/\[Productos\]/gi, productos)
+    .replace(/\[Total\]/gi,    total)
+    .replace(/\[Minutos\]/gi,  minutos)
+    .replace(/\\n/g, '\n');
+
+  const tel = '52' + pedido.telefono.replace(/\D/g,'');
+  window.open('https://wa.me/'+tel+'?text='+encodeURIComponent(mensaje), '_blank');
+
+  if(btn) { btn.textContent = '🚀 Voy en camino'; btn.disabled = false; }
 };
 
 document.getElementById('modalNoEnt').addEventListener('click', e => {
