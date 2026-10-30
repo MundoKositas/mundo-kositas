@@ -303,6 +303,9 @@ select.form-control{
   font-weight:700;margin-bottom:1rem;display:none;}
 .alert-danger{background:var(--rojo-light);color:var(--rojo-dark);}
 .alert.show{display:block;}
+/* Detalle del artículo: la imagen se muestra completa (sin recortes) en pantallas anchas y en celular */
+.det-img{aspect-ratio:auto;max-height:none;height:auto;display:block;font-size:5rem;text-align:center;}
+.det-img img{display:block;width:100%;height:auto;aspect-ratio:auto;max-height:min(360px,45vh);object-fit:contain;margin:0 auto;}
 </style>
 </head>
 <body>
