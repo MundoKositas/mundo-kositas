@@ -384,6 +384,7 @@ select.form-control{
             font-size:1.1rem;cursor:pointer;">←</button>
           <div class="section-title" style="margin:0;" id="catSelTitle">Productos</div>
         </div>
+        <div id="barraLineas" style="display:none;gap:0.6rem;overflow-x:auto;padding:0.2rem 0.1rem 0.7rem;margin-bottom:0.4rem;-webkit-overflow-scrolling:touch;"></div>
         <div class="prods-grid" id="listaProds"></div>
       </div>
 
@@ -665,7 +666,7 @@ async function cargarCatalogo() {
   // precios del carrito se alinean a la lista vigente
   carrito.forEach(i => { const v = buscarVariante(i.varianteId); if (v) i.precio = v.precio; });
   $('headerSaludo').textContent = (tel ? '📱 ' + tel : 'Invitado') + (cat.lista && cat.lista.especial ? ' · ⭐ Precios especiales' : '');
-  mostrarNivel(catSel ? (linSel ? 'prods' : 'lineas') : 'cats');
+  mostrarNivel(catSel ? 'lineas' : 'cats');
 }
 function buscarVariante(id) {
   for (const a of cat.articulos) { const v = a.variantes.find(x => x.id === id); if (v) return v; }
@@ -678,8 +679,12 @@ function fotoDe(a) { return a && a.imagenes && a.imagenes[0] || null; }
 function fotoDeCategoria(catId) {
   const cp = cat.categorias.find(c => c.id === catId);
   if (cp && cp.imagen) return cp.imagen;
-  const lineas = cat.lineas.filter(l => l.categoria_id === catId).map(l => l.id);
-  const a = cat.articulos.find(x => lineas.includes(x.linea_id) && fotoDe(x));
+  // 1) imagen de la categoría, 2) imagen de la primera línea que tenga, 3) imagen del primer artículo que tenga
+  const lins = cat.lineas.filter(l => l.categoria_id === catId);
+  const lc = lins.find(l => l.imagen);
+  if (lc) return lc.imagen;
+  const ids = lins.map(l => l.id);
+  const a = cat.articulos.find(x => ids.includes(x.linea_id) && fotoDe(x));
   return a ? fotoDe(a) : null;
 }
 function fotoDeLinea(linId) { const lp = cat.lineas.find(l => l.id === linId); if (lp && lp.imagen) return lp.imagen; const a = cat.articulos.find(x => x.linea_id === linId && fotoDe(x)); return a ? fotoDe(a) : null; }
@@ -692,46 +697,52 @@ function tarjeta(id, nombre, foto, onclick) {
 }
 function mostrarNivel(nivel) {
   $('secCategorias').style.display = nivel === 'cats' ? '' : 'none';
-  $('secLineas').style.display = nivel === 'lineas' ? '' : 'none';
-  $('secProductos').style.display = nivel === 'prods' ? '' : 'none';
+  $('secLineas').style.display = 'none';
+  $('secProductos').style.display = nivel !== 'cats' ? '' : 'none';
   $('secBusqueda').style.display = 'none';
   if (nivel === 'cats') {
     catSel = null; linSel = null;
     $('listaCats').innerHTML = cat.categorias.length
       ? cat.categorias.map(c => tarjeta(c.id, c.nombre, fotoDeCategoria(c.id), `verCategoria('${c.id}')`)).join('')
       : '<div class="loading" style="grid-column:1/-1;">Sin artículos disponibles por ahora</div>';
-  } else if (nivel === 'lineas') {
-    linSel = null;
-    const c = cat.categorias.find(x => x.id === catSel);
-    $('lineaTitulo').textContent = c ? c.nombre : 'Líneas';
-    const lins = cat.lineas.filter(l => l.categoria_id === catSel);
-    $('listaLineas').innerHTML = lins.map(l => tarjeta(l.id, l.nombre, fotoDeLinea(l.id), `verLinea('${l.id}')`)).join('');
   } else {
-    const l = cat.lineas.find(x => x.id === linSel);
-    $('catSelTitle').textContent = l ? l.nombre : 'Productos';
-    renderProductos(cat.articulos.filter(a => a.linea_id === linSel), 'listaProds');
+    // Vista de categoría: arriba las líneas, abajo los artículos de toda la categoría (o solo los de la línea elegida)
+    $('secProductos').style.display = '';
+    renderCategoria();
   }
+}
+function chipLinea(id, nombre, foto, activo) {
+  const img = foto ? `<img src="${esc(foto)}" loading="lazy" style="width:100%;height:100%;object-fit:cover;">` : '<span style="font-size:1.1rem;">📦</span>';
+  return `<div onclick="${id ? `verLinea('${id}')` : 'verLinea(null)'}" style="flex:0 0 auto;width:78px;cursor:pointer;text-align:center;">
+    <div style="width:78px;height:78px;border-radius:12px;overflow:hidden;background:#f8f8f8;display:flex;align-items:center;justify-content:center;border:2px solid ${activo ? 'var(--rojo)' : 'transparent'};">${img}</div>
+    <div style="font-size:0.62rem;font-weight:${activo ? 900 : 700};color:${activo ? 'var(--rojo)' : 'inherit'};line-height:1.15;margin-top:0.25rem;word-break:break-word;">${esc(nombre)}</div></div>`;
+}
+function renderCategoria() {
+  const c = cat.categorias.find(x => x.id === catSel);
+  const lins = cat.lineas.filter(l => l.categoria_id === catSel);
+  const l = linSel ? lins.find(x => x.id === linSel) : null;
+  $('catSelTitle').textContent = c ? c.nombre : 'Productos';
+  const barra = $('barraLineas');
+  if (lins.length > 1) {
+    barra.style.display = 'flex';
+    barra.innerHTML = chipLinea(null, 'Todo', fotoDeCategoria(catSel), !linSel) + lins.map(x => chipLinea(x.id, x.nombre, fotoDeLinea(x.id), x.id === linSel)).join('');
+  } else { barra.style.display = 'none'; barra.innerHTML = ''; }
+  const ids = lins.map(x => x.id);
+  const arts = l ? cat.articulos.filter(a => a.linea_id === l.id) : cat.articulos.filter(a => ids.includes(a.linea_id));
+  renderProductos(arts, 'listaProds');
 }
 window.irInicio = () => {
   $('buscador').value = ''; catSel = null; linSel = null;
   mostrarPag('catalogo', document.querySelectorAll('.nav-btn')[0]);
   mostrarNivel('cats'); $('pagCatalogo').scrollIntoView({ block: 'start' }); document.querySelector('.app-content').scrollTop = 0;
 };
-window.verCategoria = id => {
-  catSel = id;
-  const lins = cat.lineas.filter(l => l.categoria_id === id);
-  if (lins.length === 1) { linSel = lins[0].id; mostrarNivel('prods'); } else mostrarNivel('lineas');
-  asegurarSentinel();
-};
-window.verLinea = id => { linSel = id; mostrarNivel('prods'); asegurarSentinel(); };
+window.verCategoria = id => { catSel = id; linSel = null; mostrarNivel('lineas'); document.querySelector('.app-content').scrollTop = 0; asegurarSentinel(); };
+window.verLinea = id => { linSel = (id && id !== linSel) ? id : null; renderCategoria(); };
 window.atrasLineas = () => mostrarNivel('cats');
-window.atrasProductos = () => {
-  const lins = cat.lineas.filter(l => l.categoria_id === catSel);
-  if (lins.length > 1) { linSel = null; mostrarNivel('lineas'); } else mostrarNivel('cats');
-};
+window.atrasProductos = () => mostrarNivel('cats');
 window.buscarProducto = () => {
   const q = norm($('buscador').value.trim());
-  if (!q) { mostrarNivel(linSel ? 'prods' : catSel ? 'lineas' : 'cats'); return; }
+  if (!q) { mostrarNivel(catSel ? 'lineas' : 'cats'); return; }
   $('secCategorias').style.display = 'none'; $('secLineas').style.display = 'none'; $('secProductos').style.display = 'none';
   $('secBusqueda').style.display = '';
   const palabras = q.split(/\s+/).filter(Boolean);
@@ -965,9 +976,11 @@ window.verificarPedido = async () => {
   const t = $('verTel').value.replace(/\D/g, '').slice(-10), c = $('verCodigo').value.trim().toUpperCase();
   const e = $('verError'); e.textContent = '';
   if (t.length !== 10 || !c) { e.textContent = 'Escribe tu teléfono (10 dígitos) y el código de tu pedido, por ejemplo MK-1001.'; return; }
-  const { data, error } = await sb.rpc('cat_mis_pedidos', { p_telefono: t, p_tokens: [], p_codigo: c });
-  if (error || !data || !data.length) { e.textContent = 'No encontramos un pedido con ese teléfono y código.'; return; }
-  tel = t; lsSet('mk_tel', t); agregarLista('mk_codigos', data[0].codigo);
+  // Verifica teléfono + código y deja este dispositivo autorizado para ver TODOS los pedidos de ese teléfono
+  // (también los que se registren después desde la caja), sin volver a pedir el código.
+  const { data: tok, error } = await sb.rpc('cat_verificar_pedido', { p_telefono: t, p_codigo: c });
+  if (error || !tok) { e.textContent = 'No encontramos un pedido con ese teléfono y código.'; return; }
+  tel = t; lsSet('mk_tel', t); agregarLista('mk_tokens', tok); agregarLista('mk_codigos', c);
   $('chkTel').value = t; $('headerSaludo').textContent = '📱 ' + t;
   cargarCatalogo(); cargarMisPedidos();
 };
@@ -1013,8 +1026,8 @@ window.addEventListener('popstate', () => {
   const abiertos = [...document.querySelectorAll('.modal-overlay.open')];
   if (abiertos.length) abiertos[abiertos.length - 1].classList.remove('open');
   else if (!$('pagCatalogo').classList.contains('active')) mostrarPag('catalogo', document.querySelectorAll('.nav-btn')[0]);
-  else if ($('buscador').value.trim()) { $('buscador').value = ''; mostrarNivel(linSel ? 'prods' : catSel ? 'lineas' : 'cats'); }
-  else if (linSel) atrasProductos();
+  else if ($('buscador').value.trim()) { $('buscador').value = ''; mostrarNivel(catSel ? 'lineas' : 'cats'); }
+  else if (linSel) { linSel = null; renderCategoria(); }
   else if (catSel) mostrarNivel('cats');
   else return;
   if (estaProfundo()) history.pushState({ mk: 1 }, '');
