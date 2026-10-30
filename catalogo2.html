@@ -427,7 +427,7 @@ select.form-control{
 
   <!-- BOTTOM NAV -->
   <nav class="bottom-nav">
-    <button class="nav-btn active" onclick="mostrarPag('catalogo',this)">
+    <button class="nav-btn active" onclick="irInicio()">
       <span class="nav-icon">🏪</span><span>Catálogo</span>
     </button>
     <button class="nav-btn" onclick="mostrarPag('carrito',this)">
@@ -565,9 +565,10 @@ select.form-control{
       <!-- RESUMEN -->
       <div class="carrito-resumen" id="chkResumen"></div>
 
-      <button class="btn btn-verde" id="btnEnviarPedido" onclick="enviarPedido()">
-        📤 Enviar Pedido
-      </button>
+      <div style="position:sticky;bottom:-2rem;margin:1rem -1.25rem -2rem;padding:0.75rem 1.25rem 1rem;background:#fff;border-top:1px solid var(--border);display:flex;gap:0.6rem;z-index:5;">
+        <button class="btn btn-gris" style="flex:1;" onclick="cerrarModal('modalCheckout')">Cancelar</button>
+        <button class="btn btn-verde" style="flex:2;" id="btnEnviarPedido" onclick="enviarPedido()">📤 Enviar Pedido</button>
+      </div>
     </div>
   </div>
 </div>
@@ -672,11 +673,13 @@ function articuloDeVariante(id) { return cat.articulos.find(a => a.variantes.som
 // ---------- Navegación categorías → líneas → artículos ----------
 function fotoDe(a) { return a && a.imagenes && a.imagenes[0] || null; }
 function fotoDeCategoria(catId) {
+  const cp = cat.categorias.find(c => c.id === catId);
+  if (cp && cp.imagen) return cp.imagen;
   const lineas = cat.lineas.filter(l => l.categoria_id === catId).map(l => l.id);
   const a = cat.articulos.find(x => lineas.includes(x.linea_id) && fotoDe(x));
   return a ? fotoDe(a) : null;
 }
-function fotoDeLinea(linId) { const a = cat.articulos.find(x => x.linea_id === linId && fotoDe(x)); return a ? fotoDe(a) : null; }
+function fotoDeLinea(linId) { const lp = cat.lineas.find(l => l.id === linId); if (lp && lp.imagen) return lp.imagen; const a = cat.articulos.find(x => x.linea_id === linId && fotoDe(x)); return a ? fotoDe(a) : null; }
 function tarjeta(id, nombre, foto, onclick) {
   const img = foto ? `<img src="${esc(foto)}" loading="lazy" style="width:100%;height:100%;object-fit:cover;">` : '<span style="font-size:2rem;">📦</span>';
   return `<div class="cat-card" onclick="${onclick}" style="padding:0;overflow:hidden;display:flex;flex-direction:column;">
@@ -706,12 +709,18 @@ function mostrarNivel(nivel) {
     renderProductos(cat.articulos.filter(a => a.linea_id === linSel), 'listaProds');
   }
 }
+window.irInicio = () => {
+  $('buscador').value = ''; catSel = null; linSel = null;
+  mostrarPag('catalogo', document.querySelectorAll('.nav-btn')[0]);
+  mostrarNivel('cats'); $('pagCatalogo').scrollIntoView({ block: 'start' }); document.querySelector('.app-content').scrollTop = 0;
+};
 window.verCategoria = id => {
   catSel = id;
   const lins = cat.lineas.filter(l => l.categoria_id === id);
   if (lins.length === 1) { linSel = lins[0].id; mostrarNivel('prods'); } else mostrarNivel('lineas');
+  asegurarSentinel();
 };
-window.verLinea = id => { linSel = id; mostrarNivel('prods'); };
+window.verLinea = id => { linSel = id; mostrarNivel('prods'); asegurarSentinel(); };
 window.atrasLineas = () => mostrarNivel('cats');
 window.atrasProductos = () => {
   const lins = cat.lineas.filter(l => l.categoria_id === catSel);
@@ -722,7 +731,13 @@ window.buscarProducto = () => {
   if (!q) { mostrarNivel(linSel ? 'prods' : catSel ? 'lineas' : 'cats'); return; }
   $('secCategorias').style.display = 'none'; $('secLineas').style.display = 'none'; $('secProductos').style.display = 'none';
   $('secBusqueda').style.display = '';
-  const res = cat.articulos.filter(a => norm(a.nombre).includes(q) || a.variantes.some(v => norm(v.nombre).includes(q)));
+  const palabras = q.split(/\s+/).filter(Boolean);
+  const res = cat.articulos.filter(a => {
+    const l = cat.lineas.find(x => x.id === a.linea_id), c = l && cat.categorias.find(x => x.id === l.categoria_id);
+    const texto = norm([a.nombre, ...a.variantes.map(v => v.nombre || ''), l ? l.nombre : '', c ? c.nombre : ''].join(' '));
+    return palabras.every(w => texto.includes(w));
+  });
+  asegurarSentinel();
   renderProductos(res, 'listaBusqueda');
 };
 
@@ -961,15 +976,16 @@ window.mostrarPag = (pag, btn) => {
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
   $(mapa[pag]).classList.add('active'); (btn || document.querySelectorAll('.nav-btn')[['catalogo', 'carrito', 'misPedidos'].indexOf(pag)]).classList.add('active');
   clearInterval(timerPedidos);
+  asegurarSentinel();
   if (pag === 'carrito') renderCarrito();
   if (pag === 'misPedidos') {
     if (!tel || (!tokens().length && !codigosOk().length)) { $('sinSesion').style.display = 'block'; $('conSesion').style.display = 'none'; if (tel) $('verTel').value = tel; }
     else { cargarMisPedidos(); timerPedidos = setInterval(cargarMisPedidos, 30000); }
   }
 };
-window.abrirModal = id => $(id).classList.add('open');
+window.abrirModal = id => { $(id).classList.add('open'); asegurarSentinel(); };
 window.cerrarModal = id => $(id).classList.remove('open');
-document.querySelectorAll('.modal-overlay').forEach(o => o.addEventListener('click', e => { if (e.target === o) o.classList.remove('open'); }));
+document.querySelectorAll('.modal-overlay').forEach(o => o.addEventListener('click', e => { if (e.target === o && !['modalCheckout', 'modalExito'].includes(o.id)) o.classList.remove('open'); }));
 function mostrarToast(msg) {
   const t = document.createElement('div'); t.textContent = msg;
   Object.assign(t.style, { position: 'fixed', bottom: '80px', left: '50%', transform: 'translateX(-50%)', background: '#333', color: '#fff', padding: '0.6rem 1.25rem',
@@ -981,6 +997,26 @@ window.addEventListener('DOMContentLoaded', () => {
   const u = (new URLSearchParams(location.search).get('tel') || lsGet('mk_tel') || '').replace(/\D/g, '');
   if (u) $('telInicio').value = u;
 });
+
+// ---------- Botón/gesto "atrás" del celular ----------
+// Mientras el cliente está dentro de un nivel (línea, buscador, carrito, ventana abierta) se deja una entrada
+// extra en el historial; al regresar con el gesto se sube un nivel en vez de salir de la página.
+function estaProfundo() {
+  return !!(document.querySelector('.modal-overlay.open') || !$('pagCatalogo').classList.contains('active') || catSel || $('buscador').value.trim());
+}
+function asegurarSentinel() { if (estaProfundo() && !(history.state && history.state.mk === 1)) history.pushState({ mk: 1 }, ''); }
+history.replaceState({ mk: 0 }, '');
+window.addEventListener('popstate', () => {
+  const abiertos = [...document.querySelectorAll('.modal-overlay.open')];
+  if (abiertos.length) abiertos[abiertos.length - 1].classList.remove('open');
+  else if (!$('pagCatalogo').classList.contains('active')) mostrarPag('catalogo', document.querySelectorAll('.nav-btn')[0]);
+  else if ($('buscador').value.trim()) { $('buscador').value = ''; mostrarNivel(linSel ? 'prods' : catSel ? 'lineas' : 'cats'); }
+  else if (linSel) atrasProductos();
+  else if (catSel) mostrarNivel('cats');
+  else return;
+  if (estaProfundo()) history.pushState({ mk: 1 }, '');
+});
+$('buscador').addEventListener('input', asegurarSentinel);
 
 </script>
 <script>
