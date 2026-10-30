@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#8E24AA">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="MK Repartidor">
+<title>Mis Pedidos — Mundo Kositas</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root {
+  --morado:#8E24AA; --morado-dark:#6A1B9A; --morado-light:#F3E5F5;
+  --verde:#27AE60;  --verde-light:#D5F5E3;
+  --azul:#2980B9;   --azul-light:#D6EAF8;
+  --naranja:#E67E22; --amarillo:#F39C12;
+  --rojo:#C0392B;   --rojo-light:#FADBD8;
+  --gris-dark:#2C3E50; --gris:#7F8C8D; --gris-light:#ECF0F1;
+  --blanco:#FFFFFF; --bg:#F4F4F4; --border:#DDD;
+  --shadow:0 2px 12px rgba(0,0,0,0.07);
+  --shadow-lg:0 8px 32px rgba(0,0,0,0.13);
+  --radius:14px; --radius-sm:10px;
+  --font:'Nunito',sans-serif;
+  --header-h:58px; --nav-h:62px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;}
+body{font-family:var(--font);background:var(--bg);color:var(--gris-dark);
+  -webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent;}
+button{cursor:pointer;font-family:var(--font);}
+
+/* PANTALLA DE CARGA */
+#cargando{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  min-height:100vh;gap:1rem;
+  background:linear-gradient(160deg,#4A148C 0%,var(--morado) 100%);
+  color:white;
+}
+.spin{width:44px;height:44px;border:4px solid rgba(255,255,255,0.3);
+  border-top-color:white;border-radius:50%;animation:spin 0.8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.carga-msg{font-size:0.9rem;font-weight:700;opacity:0.9;}
+
+/* ERROR */
+#pantallaError{
+  display:none;flex-direction:column;align-items:center;justify-content:center;
+  min-height:100vh;padding:2rem;text-align:center;
+  background:linear-gradient(160deg,#4A148C 0%,var(--morado) 100%);
+}
+.error-card{background:white;border-radius:20px;padding:2rem 1.5rem;
+  max-width:340px;width:100%;box-shadow:var(--shadow-lg);}
+.error-icon{font-size:3.5rem;margin-bottom:0.75rem;}
+.error-titulo{font-size:1.1rem;font-weight:900;margin-bottom:0.5rem;color:var(--gris-dark);}
+.error-desc{font-size:0.85rem;color:var(--gris);font-weight:600;line-height:1.5;}
+
+/* APP */
+#appRep{display:none;height:100vh;overflow:hidden;flex-direction:column;}
+#appRep.visible{display:flex;}
+
+/* HEADER */
+.header{background:var(--morado);color:white;height:var(--header-h);
+  padding:0 1.25rem;display:flex;align-items:center;justify-content:space-between;
+  flex-shrink:0;box-shadow:0 2px 10px rgba(106,27,154,0.35);}
+.header-left h2{font-size:1rem;font-weight:900;}
+.header-left small{font-size:0.7rem;opacity:0.8;}
+.header-badge{background:rgba(255,255,255,0.2);border-radius:8px;
+  padding:0.3rem 0.65rem;font-size:0.75rem;font-weight:800;}
+
+/* CONTENT */
+.content{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:1rem;}
+
+/* AVISO FUTUROS */
+.aviso-futuros{background:#FEF9E7;border-left:4px solid var(--amarillo);
+  border-radius:var(--radius-sm);padding:0.65rem 0.9rem;margin-bottom:0.75rem;
+  font-size:0.8rem;font-weight:700;color:#7D6608;display:none;}
+
+/* PEDIDO CARD */
+.pedido-card{background:white;border-radius:var(--radius);padding:1rem;
+  margin-bottom:0.75rem;box-shadow:var(--shadow);border-left:4px solid var(--amarillo);}
+.pc-dir{font-weight:800;font-size:0.95rem;margin-bottom:0.2rem;}
+.pc-col{font-size:0.8rem;color:var(--gris);font-weight:600;margin-bottom:0.3rem;}
+.pc-prod{font-size:0.82rem;font-weight:700;color:var(--gris-dark);margin-bottom:0.2rem;}
+.pc-nombre{font-size:0.78rem;color:var(--gris);font-weight:600;}
+.pc-hora{font-size:0.78rem;color:var(--gris);font-weight:600;}
+.pc-notas{font-size:0.78rem;color:var(--gris-dark);font-weight:600;
+  background:var(--gris-light);border-radius:6px;padding:0.35rem 0.6rem;margin-top:0.35rem;}
+.pc-bottom{display:flex;justify-content:space-between;align-items:center;
+  margin-top:0.6rem;}
+.pc-total{font-size:1.25rem;font-weight:900;color:var(--morado);}
+.pc-pago{font-size:0.75rem;color:var(--gris);font-weight:700;}
+.pc-acciones{display:flex;gap:0.5rem;flex-wrap:wrap;margin-top:0.75rem;}
+
+/* BOTONES */
+.btn-sm{display:inline-flex;align-items:center;gap:0.3rem;padding:0.5rem 0.9rem;
+  border:none;border-radius:999px;font-size:0.8rem;font-weight:700;cursor:pointer;
+  font-family:var(--font);transition:transform 0.15s;text-decoration:none;}
+.btn-sm:active{transform:scale(0.94);}
+.btn-verde{background:var(--verde);color:white;}
+.btn-rojo{background:var(--rojo);color:white;}
+.btn-azul{background:var(--azul);color:white;}
+
+/* ORDEN RUTA */
+.btn-orden{width:28px;height:28px;border-radius:6px;border:1px solid var(--border);
+  background:var(--gris-light);font-weight:900;cursor:pointer;font-size:0.85rem;
+  display:inline-flex;align-items:center;justify-content:center;}
+
+/* EMPTY */
+.empty{text-align:center;padding:3rem 1rem;color:var(--gris);}
+.empty-icon{font-size:3rem;margin-bottom:0.75rem;}
+.empty-text{font-size:0.9rem;font-weight:700;}
+
+/* MODAL */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);
+  z-index:200;align-items:flex-end;justify-content:center;}
+.modal-overlay.open{display:flex;}
+.modal-sheet{background:white;border-radius:22px 22px 0 0;padding:1.5rem 1.25rem 2rem;
+  width:100%;max-width:540px;max-height:90vh;overflow-y:auto;}
+.modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;}
+.modal-title{font-size:1.05rem;font-weight:900;}
+.modal-close{background:var(--gris-light);border:none;width:32px;height:32px;
+  border-radius:50%;font-size:1.1rem;display:flex;align-items:center;
+  justify-content:center;cursor:pointer;color:var(--gris);}
+
+/* MOTIVOS */
+.motivo-opt{display:flex;align-items:center;gap:0.75rem;padding:0.75rem;
+  background:var(--gris-light);border-radius:var(--radius-sm);cursor:pointer;
+  font-weight:700;font-size:0.88rem;margin-bottom:0.5rem;}
+.form-control{width:100%;padding:0.8rem 1rem;border:2px solid var(--border);
+  border-radius:var(--radius-sm);font-size:0.9rem;font-weight:600;
+  font-family:var(--font);outline:none;}
+.form-control:focus{border-color:var(--morado);}
+.btn-full{display:block;width:100%;padding:0.9rem;border:none;border-radius:var(--radius-sm);
+  font-size:1rem;font-weight:800;font-family:var(--font);cursor:pointer;
+  background:var(--rojo);color:white;margin-top:1rem;}
+
+/* CORTE */
+.corte-card{background:white;border-radius:var(--radius);padding:1rem;
+  box-shadow:var(--shadow);margin-bottom:0.75rem;}
+.corte-titulo{font-size:0.7rem;font-weight:800;color:var(--gris);
+  text-transform:uppercase;letter-spacing:0.06em;margin-bottom:0.5rem;}
+.corte-total{font-size:1.8rem;font-weight:900;color:var(--morado);}
+.corte-row{display:flex;justify-content:space-between;font-size:0.85rem;
+  font-weight:700;padding:0.35rem 0;border-bottom:1px solid var(--gris-light);}
+.corte-row:last-child{border-bottom:none;}
+
+/* NAV */
+.bottom-nav{background:white;border-top:1px solid var(--border);display:flex;
+  height:var(--nav-h);flex-shrink:0;z-index:80;
+  padding-bottom:env(safe-area-inset-bottom,0);}
+.nav-btn{flex:1;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:0.15rem;border:none;background:none;
+  color:#AAA;font-size:0.6rem;font-weight:700;font-family:var(--font);
+  text-transform:uppercase;letter-spacing:0.05em;cursor:pointer;}
+.nav-btn.active{color:var(--morado);}
+.nav-icon{font-size:1.45rem;line-height:1;}
+
+/* LOADING INLINE */
+.loading{text-align:center;padding:2rem;color:var(--gris);font-weight:600;}
+</style>
+</head>
+<body>
+
+<!-- CARGANDO -->
+<div id="cargando">
+  <div class="spin"></div>
+  <div class="carga-msg" id="cargaMsg">Verificando acceso…</div>
+</div>
+
+<!-- ERROR -->
+<div id="pantallaError">
+  <div class="error-card">
+    <div class="error-icon">⚠️</div>
+    <div class="error-titulo" id="errorTitulo">Link no válido</div>
+    <div class="error-desc" id="errorDesc">
+      Este link expiró o no es válido.<br>Pide uno nuevo al administrador.
+    </div>
+  </div>
+</div>
+
+<!-- APP REPARTIDOR -->
+<div id="appRep">
+  <header class="header">
+    <div class="header-left">
+      <h2 id="repNombre">Mis Pedidos</h2>
+      <small id="repFecha"></small>
+    </div>
+    <span class="header-badge" id="repContador">0 pedidos</span>
+  </header>
+
+  <div class="content" id="appContent">
+
+    <!-- PEDIDOS -->
+    <div id="pagPedidos">
+      <div class="aviso-futuros" id="avisoPedidosFuturos"></div>
+      <div id="listaMisPedidos"><div class="loading">Cargando pedidos…</div></div>
+    </div>
+
+    <!-- CORTE -->
+    <div id="pagCorte" style="display:none;">
+      <div id="corteContenido"><div class="loading">Cargando…</div></div>
+    </div>
+
+  </div>
+
+  <nav class="bottom-nav">
+    <button class="nav-btn active" id="navPed" onclick="mostrarPag('pedidos')">
+      <span class="nav-icon">📋</span><span>Mis Pedidos</span>
+    </button>
+    <button class="nav-btn" id="navCor" onclick="mostrarPag('corte')">
+      <span class="nav-icon">💰</span><span>Mi Corte</span>
+    </button>
+  </nav>
+</div>
+
+<!-- MODAL NO ENTREGADO -->
+<div class="modal-overlay" id="modalNoEnt">
+  <div class="modal-sheet">
+    <div class="modal-header">
+      <span class="modal-title">⚠️ No se pudo entregar</span>
+      <button class="modal-close" onclick="cerrarModal()">✕</button>
+    </div>
+    <p style="font-size:0.85rem;color:var(--gris);font-weight:600;margin-bottom:0.75rem;">
+      Indica el motivo:
+    </p>
+    <input type="hidden" id="nePedidoId">
+    <label class="motivo-opt">
+      <input type="radio" name="neMotivo" value="Cliente no estaba en casa">
+      🏠 Cliente no estaba en casa
+    </label>
+    <label class="motivo-opt">
+      <input type="radio" name="neMotivo" value="Dirección incorrecta o no encontrada">
+      📍 Dirección incorrecta
+    </label>
+    <label class="motivo-opt">
+      <input type="radio" name="neMotivo" value="Cliente solicitó cancelar">
+      ❌ Cliente solicitó cancelar
+    </label>
+    <label class="motivo-opt">
+      <input type="radio" name="neMotivo" value="otro"
+             onchange="document.getElementById('neMotivoOtro').style.display='block'">
+      ✏️ Otro motivo
+    </label>
+    <input type="text" id="neMotivoOtro" class="form-control"
+           placeholder="Describe el motivo…" style="display:none;margin-top:0.5rem;">
+    <button class="btn-full" onclick="confirmarNoEntregado()">
+      ⚠️ Confirmar no entregado
+    </button>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const SUPABASE_URL = "https://vsfzkktmdwqkfbecmfcj.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZzZnpra3RtZHdxa2ZiZWNtZmNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgxMzAwMTgsImV4cCI6MjEwMzcwNjAxOH0.q6unj5y4p2alR3YgcEZ9N3_UTXLQd_TC9Zfxm6WfDzs";
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const money = n => '$' + (Number(n) || 0).toLocaleString('es-MX', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+const token = new URLSearchParams(location.search).get('token');
+let datos = null, rutaOrden = [], timer = null, nombreRep = 'Repartidor';
+
+function mostrarError(titulo, desc) { $('cargando').style.display = 'none'; $('pantallaError').style.display = 'flex'; $('errorTitulo').textContent = titulo; $('errorDesc').textContent = desc; }
+function normErr(e) { return (e && e.message) ? e.message : String(e); }
+
+async function cargar(primera) {
+  const { data, error } = await sb.rpc('rep_pedidos', { p_token: token });
+  if (error) {
+    if (primera) mostrarError('Link no válido', /válido|vencido/i.test(error.message) ? error.message : 'No se pudo verificar el link. Revisa tu internet e intenta de nuevo.');
+    return;
+  }
+  datos = data; nombreRep = data.repartidor || 'Repartidor';
+  // conserva el orden de ruta que ya armó el repartidor; lo nuevo se agrega al final
+  const ids = data.pedidos.map(p => p.id);
+  rutaOrden = rutaOrden.filter(id => ids.includes(id)).concat(ids.filter(id => !rutaOrden.includes(id)));
+  if (primera) {
+    $('repNombre').textContent = nombreRep;
+    $('repFecha').textContent = new Date().toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' });
+    $('cargando').style.display = 'none'; $('appRep').classList.add('visible');
+  }
+  renderPedidos();
+}
+function pedidosOrdenados() { return rutaOrden.map(id => datos.pedidos.find(p => p.id === id)).filter(Boolean); }
+function textoItems(p) { return (p.items || []).map(it => it.nombre + (it.cantidad > 1 ? ' x' + it.cantidad : '')).join(' · ') || '—'; }
+
+function renderPedidos() {
+  const lista = pedidosOrdenados();
+  $('repContador').textContent = lista.length + ' pedido' + (lista.length !== 1 ? 's' : '');
+  const av = $('avisoPedidosFuturos');
+  if (datos.futuros) { av.textContent = '📅 Tienes ' + datos.futuros + ' pedido(s) para días siguientes'; av.style.display = 'block'; } else av.style.display = 'none';
+  const cont = $('listaMisPedidos');
+  if (!lista.length) { cont.innerHTML = '<div class="empty"><div class="empty-icon">✅</div><div class="empty-text">Sin pedidos pendientes</div></div>'; return; }
+  cont.innerHTML = '<div style="font-size:0.72rem;color:var(--gris);font-weight:700;margin-bottom:0.5rem;">↕️ Toca ↑ ↓ para ordenar tu ruta</div>' + lista.map((p, idx) => {
+    const mapsQ = encodeURIComponent((p.domicilio || '') + (p.colonia ? ' ' + p.colonia : '') + ' Durango');
+    const cambio = p.metodo_pago !== 'transferencia' && p.paga_con && Number(p.paga_con) > Number(p.total) ? Number(p.paga_con) - Number(p.total) : 0;
+    return `<div class="pedido-card">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+        <div style="flex:1;min-width:0;">
+          <div class="pc-dir">📍 ${esc(p.domicilio || 'Sin dirección')}</div>
+          <div class="pc-col">${esc(p.colonia || '—')} · <span style="font-weight:800;">${esc(p.codigo)}</span></div>
+          <div class="pc-prod">📦 ${esc(textoItems(p))}</div>
+          ${p.nombre ? `<div class="pc-nombre">👤 ${esc(p.nombre)}</div>` : ''}
+          ${p.telefono ? `<div class="pc-nombre">📱 <a href="tel:${esc(p.telefono)}">${esc(p.telefono)}</a></div>` : ''}
+          ${p.hora_desde ? `<div class="pc-hora">⏰ ${esc(p.hora_desde)} – ${esc(p.hora_hasta || '')}</div>` : ''}
+          ${p.fecha_entrega ? `<div class="pc-hora">📅 ${esc(p.fecha_entrega)}</div>` : ''}
+          ${p.notas ? `<div class="pc-notas">📝 ${esc(p.notas)}</div>` : ''}
+        </div>
+        <div style="display:flex;flex-direction:column;gap:0.25rem;margin-left:0.5rem;">
+          ${idx > 0 ? `<button class="btn-orden" onclick="moverRuta(${idx},-1)">↑</button>` : '<div style="width:28px;"></div>'}
+          ${idx < lista.length - 1 ? `<button class="btn-orden" onclick="moverRuta(${idx},1)">↓</button>` : '<div style="width:28px;"></div>'}
+        </div>
+      </div>
+      <div class="pc-bottom">
+        <div class="pc-total">${money(p.total)}</div>
+        <div class="pc-pago">${p.metodo_pago === 'transferencia' ? '🏦 Transferencia' : '💵 Efectivo'}${p.metodo_pago !== 'transferencia' && p.paga_con ? ' · paga con ' + money(p.paga_con) : ''}${cambio ? ' · lleva cambio ' + money(cambio) : ''}</div>
+      </div>
+      <div class="pc-acciones">
+        <button class="btn-sm btn-verde" onclick="marcarEntregado('${p.id}')">✅ Entregado</button>
+        <button class="btn-sm btn-rojo" onclick="abrirNoEntregado('${p.id}')">⚠️ No entregado</button>
+        <a href="https://maps.google.com/?q=${mapsQ}" target="_blank" rel="noopener" class="btn-sm btn-azul">🗺️ Mapa</a>
+        ${p.telefono ? `<button class="btn-sm" id="camino-${p.id}" onclick="voyEnCamino('${p.id}')" style="background:#25D366;color:white;">🚀 Voy en camino</button>` : ''}
+      </div></div>`;
+  }).join('');
+}
+window.moverRuta = (idx, dir) => {
+  const n = idx + dir; if (n < 0 || n >= rutaOrden.length) return;
+  [rutaOrden[idx], rutaOrden[n]] = [rutaOrden[n], rutaOrden[idx]]; renderPedidos();
+};
+
+function abrirWhatsApp(tel, texto) { window.open('https://wa.me/52' + String(tel).replace(/\D/g, '').slice(-10) + '?text=' + encodeURIComponent(texto), '_blank'); }
+
+window.marcarEntregado = async id => {
+  if (!confirm('¿Confirmas que el pedido fue entregado?')) return;
+  const { data, error } = await sb.rpc('rep_marcar', { p_token: token, p_pedido_id: id, p_accion: 'entregado' });
+  if (error) { alert(normErr(error)); return; }
+  await cargar(false);
+  if (data && data.telefono) {
+    const base = location.origin + location.pathname.replace(/[^/]*$/, '');
+    const msg = '📦 ¡Entregado! Gracias ' + (data.nombre || '') + ' 💛\nFue un gusto atenderte en Mundo Kositas 🏠\n¿Todo llegó bien? Escríbenos 😊\n\n⭐ ¿Cómo estuvo tu experiencia?\nCalifica nuestro servicio aquí 👇\n' + base + 'resena2.html?token=' + data.resena_token;
+    abrirWhatsApp(data.telefono, msg);
+  }
+};
+window.abrirNoEntregado = id => {
+  $('nePedidoId').value = id;
+  document.querySelectorAll('input[name="neMotivo"]').forEach(r => r.checked = false);
+  $('neMotivoOtro').style.display = 'none'; $('neMotivoOtro').value = '';
+  $('modalNoEnt').classList.add('open');
+};
+window.confirmarNoEntregado = async () => {
+  const id = $('nePedidoId').value, checked = document.querySelector('input[name="neMotivo"]:checked');
+  if (!checked) { alert('Selecciona un motivo.'); return; }
+  const motivo = checked.value === 'otro' ? ($('neMotivoOtro').value.trim() || 'Otro') : checked.value;
+  const { error } = await sb.rpc('rep_marcar', { p_token: token, p_pedido_id: id, p_accion: 'noentregado', p_motivo: motivo });
+  if (error) { alert(normErr(error)); return; }
+  cerrarModal(); await cargar(false);
+  alert('Anotado. Regresa los productos a la tienda y avisa en caja para cancelar la venta de ese pedido.');
+};
+window.cerrarModal = () => $('modalNoEnt').classList.remove('open');
+$('modalNoEnt').addEventListener('click', e => { if (e.target === $('modalNoEnt')) cerrarModal(); });
+
+window.voyEnCamino = async id => {
+  const p = datos.pedidos.find(x => x.id === id); if (!p) return;
+  const btn = $('camino-' + id); if (btn) { btn.textContent = '📍 Obteniendo ubicación…'; btn.disabled = true; }
+  let minutos = null, pos = null;
+  try { pos = await new Promise((res, rej) => navigator.geolocation.getCurrentPosition(res, rej, { enableHighAccuracy: true, timeout: 10000 })); } catch (e) { pos = null; }
+  if (pos) {
+    try {
+      const intentos = [(p.domicilio || '') + ', ' + (p.colonia || '') + ', Durango, Dgo, México', (p.colonia || '') + ', Durango, Dgo, México'];
+      const bbox = '&viewbox=-104.75,24.15,-104.55,23.95&bounded=1';
+      let lat2 = null, lng2 = null;
+      for (const q of intentos) {
+        const r = await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=mx' + bbox + '&q=' + encodeURIComponent(q), { headers: { 'Accept-Language': 'es' } });
+        const d = await r.json();
+        if (d.length) { lat2 = parseFloat(d[0].lat); lng2 = parseFloat(d[0].lon); break; }
+      }
+      if (lat2 && lng2) {
+        const R = 6371, la = pos.coords.latitude, lo = pos.coords.longitude, dLat = (lat2 - la) * Math.PI / 180, dLng = (lng2 - lo) * Math.PI / 180;
+        const a = Math.sin(dLat / 2) ** 2 + Math.cos(la * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
+        const dist = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        const m = Math.round((dist * 1.3 / 40) * 60);
+        minutos = m <= 60 ? Math.max(2, m) : null;
+      }
+    } catch (e) { /* sin estimación */ }
+  }
+  const plantilla = (datos.mensajes && datos.mensajes.voyEnCamino) || '🏠 Hola [Nombre], soy el repartidor de Mundo Kositas 🛵\nSigue su pedido: [Productos]\nTotal a pagar: $[Total]\n\nEstoy en camino, llego aproximadamente en [Minutos] minutos 📍\n¡Favor de estar al pendiente! 😊';
+  const productos = (p.items || []).map(it => it.nombre + (it.cantidad > 1 ? ' x' + it.cantidad : '')).join(', ');
+  const msg = plantilla.replace(/\[Nombre\]/gi, p.nombre || '').replace(/\[Productos\]/gi, productos).replace(/\[Total\]/gi, Number(p.total).toLocaleString('es-MX')).replace(/\[Minutos\]/gi, minutos ? String(minutos) : '??').replace(/\\n/g, '\n');
+  sb.rpc('rep_marcar', { p_token: token, p_pedido_id: id, p_accion: 'camino' });
+  abrirWhatsApp(p.telefono, msg);
+  if (btn) { btn.textContent = '🚀 Voy en camino'; btn.disabled = false; }
+};
+
+// ---------- Corte ----------
+async function renderCorte() {
+  const cont = $('corteContenido'); cont.innerHTML = '<div class="loading">Calculando corte…</div>';
+  const { data, error } = await sb.rpc('rep_corte', { p_token: token });
+  if (error) { cont.innerHTML = '<div class="empty"><div class="empty-text">' + esc(normErr(error)) + '</div></div>'; return; }
+  const ent = data.entregados || [], ef = ent.filter(p => p.metodo_pago !== 'transferencia'), tr = ent.filter(p => p.metodo_pago === 'transferencia');
+  const suma = a => a.reduce((s, p) => s + (Number(p.total) || 0), 0);
+  let h = `<div class="corte-card" style="background:var(--morado);color:white;margin-bottom:0.75rem;">
+      <div style="font-size:0.7rem;font-weight:800;opacity:0.8;text-transform:uppercase;margin-bottom:0.3rem;">Lo que debes en total a la tienda</div>
+      <div class="corte-total" style="color:white;">${money(data.saldo)}</div>
+      <div style="font-size:0.72rem;opacity:0.85;margin-top:0.3rem;">Se paga en caja con abonos: el efectivo que cobraste y las transferencias que el cajero valide.</div></div>`;
+  if (!ent.length) h += '<div class="empty"><div class="empty-icon">💰</div><div class="empty-text">Sin entregas hoy</div></div>';
+  if (ef.length) h += `<div class="corte-card"><div class="corte-titulo">💵 Efectivo a entregar en caja (hoy)</div>
+      <div style="font-size:1.5rem;font-weight:900;color:var(--verde);margin-bottom:0.5rem;">${money(suma(ef))}</div>
+      ${ef.map(p => `<div class="corte-row"><span>${esc(p.nombre || 'Sin nombre')} · ${esc(p.colonia || '—')}</span><span>${money(p.total)}</span></div>`).join('')}</div>`;
+  if (tr.length) h += `<div class="corte-card"><div class="corte-titulo">🏦 Transferencias de clientes (hoy)</div>
+      <div style="font-size:1.5rem;font-weight:900;color:var(--azul);margin-bottom:0.5rem;">${money(suma(tr))}</div>
+      <div style="font-size:0.72rem;color:var(--gris);margin-bottom:0.4rem;">Reporta cada transferencia ya recibida; el cajero la valida y se descuenta de tu cuenta.</div>
+      ${tr.map(p => `<div class="corte-row" style="align-items:center;gap:0.5rem;"><span style="flex:1;">${esc(p.nombre || 'Sin nombre')} · ${esc(p.colonia || '—')}<br><small>${esc(p.codigo)} · ${money(p.total)}</small></span>
+        ${p.reporte === 'validado' ? '<span style="color:var(--verde);font-weight:800;">✔ Validada</span>' : p.reporte === 'pendiente' ? '<span style="color:var(--naranja);font-weight:800;">⏳ En revisión</span>'
+          : `<button class="btn-sm btn-azul" onclick="reportarPago('${p.id}')">Reportar</button>`}</div>`).join('')}</div>`;
+  if ((data.no_entregados || []).length) h += `<div class="corte-card" style="border:2px solid var(--rojo);"><div class="corte-titulo">⚠️ No entregados — regresa estos productos</div>
+      ${data.no_entregados.map(p => `<div class="corte-row"><span>${esc(p.nombre || 'Sin nombre')} · ${esc(p.codigo)}<br><small>${esc(p.motivo || '')}</small></span><span>${money(p.total)}</span></div>`).join('')}
+      <div style="font-size:0.72rem;color:var(--gris);margin-top:0.4rem;">Al regresarlos, el cajero cancela la venta y se quita de tu cuenta.</div></div>`;
+  cont.innerHTML = h;
+}
+window.reportarPago = async id => {
+  const ref = prompt('Referencia o últimos dígitos de la transferencia (opcional):', '');
+  if (ref === null) return;
+  const { error } = await sb.rpc('rep_reportar_pago', { p_token: token, p_pedido_id: id, p_referencia: ref });
+  if (error) { alert(normErr(error)); return; }
+  renderCorte();
+};
+window.mostrarPag = pag => {
+  $('pagPedidos').style.display = pag === 'pedidos' ? 'block' : 'none';
+  $('pagCorte').style.display = pag === 'corte' ? 'block' : 'none';
+  $('navPed').classList.toggle('active', pag === 'pedidos'); $('navCor').classList.toggle('active', pag === 'corte');
+  if (pag === 'corte') renderCorte(); else cargar(false);
+};
+
+if (!token) mostrarError('Sin acceso', 'Este link no contiene un código de acceso válido.');
+else { cargar(true); timer = setInterval(() => { if ($('pagPedidos').style.display !== 'none' && !$('modalNoEnt').classList.contains('open')) cargar(false); }, 30000); }
+
+</script>
+</body>
+</html>
