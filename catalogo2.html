@@ -659,6 +659,12 @@ async function cargarConfig() {
   cfg = data || {};
   poblarColonias();
 }
+let resArt = {};
+async function cargarResenasArticulos() {
+  const { data } = await sb.rpc('cat_resenas_articulos'); resArt = {};
+  (data || []).forEach(r => { resArt[r.producto_id] = r; });
+}
+const estrellasHtml = id => { const r = resArt[id]; return r ? `<div class="prod-variantes" style="color:#b45309;">⭐ ${Number(r.promedio).toFixed(1)} <span style="color:var(--gris);">(${r.n} ${r.n === 1 ? 'reseña' : 'reseñas'})</span></div>` : ''; };
 async function cargarCatalogo() {
   $('listaCats').innerHTML = '<div class="loading">Cargando…</div>';
   const { data, error } = await sb.rpc('cat_catalogo', { p_telefono: tel });
@@ -667,6 +673,7 @@ async function cargarCatalogo() {
     return;
   }
   cat = data;
+  cargarResenasArticulos();
   // precios del carrito se alinean a la lista vigente
   carrito.forEach(i => { const v = buscarVariante(i.varianteId); if (v) i.precio = v.precio; });
   $('headerSaludo').textContent = (tel ? '📱 ' + tel : 'Invitado') + (cat.lista && cat.lista.especial ? ' · ⭐ Precios especiales' : '');
@@ -774,7 +781,7 @@ function renderProductos(arr, contId) {
     return `<div class="prod-card" onclick="abrirProducto('${a.id}')">
       <div class="prod-img">${foto ? `<img src="${esc(foto)}" loading="lazy">` : '📦'}</div>
       <div class="prod-body"><div class="prod-nombre">${esc(a.nombre)}</div>
-        ${nVars > 1 ? `<div class="prod-variantes">${nVars} opciones</div>` : ''}
+        ${nVars > 1 ? `<div class="prod-variantes">${nVars} opciones</div>` : ''}${estrellasHtml(a.id)}
         <div class="prod-precio">${rangoPrecio(a)}</div>
         <button class="prod-add" ${disp ? '' : 'disabled style="background:#bbb;"'}>${disp ? 'Ver / Agregar' : 'Agotado'}</button></div></div>`;
   }).join('');
@@ -796,7 +803,7 @@ function pintarDetalle() {
       imgs.map((u, i) => `<img src="${esc(u)}" onclick="verImg(${i})" class="var-chip-img ${i === imgIdx ? 'active' : ''}">`).join('') + '</div>';
   }
   $('modalProdImg').innerHTML = html;
-  $('detNombre').textContent = a.nombre;
+  $('detNombre').textContent = a.nombre + (resArt[a.id] ? '  ⭐ ' + Number(resArt[a.id].promedio).toFixed(1) + ' (' + resArt[a.id].n + ')' : '');
   $('detDesc').textContent = '';
   $('detPrecio').textContent = money(v.precio);
   const hayVars = a.variantes.length > 1 || a.variantes[0].nombre;

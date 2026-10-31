@@ -140,6 +140,7 @@ textarea.form-control{resize:vertical;min-height:90px;line-height:1.5;}
     <div class="stars-container" id="starsSrv"></div>
     <div class="stars-label" id="labelSrv">Toca para calificar</div>
 
+    <div id="seccionArticulos" style="display:none;"><div class="seccion-titulo">🛍️ ¿Qué tal tus productos? <span style="font-weight:600;font-size:0.75rem;">(opcional)</span></div><div id="listaArticulosRes"></div></div>
     <!-- COMENTARIO -->
     <div style="margin-top:1rem;">
       <label class="form-label">Comentario (opcional)</label>
@@ -197,7 +198,7 @@ const SUPABASE_URL = "https://vsfzkktmdwqkfbecmfcj.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZzZnpra3RtZHdxa2ZiZWNtZmNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgxMzAwMTgsImV4cCI6MjEwMzcwNjAxOH0.q6unj5y4p2alR3YgcEZ9N3_UTXLQd_TC9Zfxm6WfDzs";
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
 const $ = id => document.getElementById(id);
-let tokenId = null, estrellaRep = 0, estrellaSrv = 0;
+let tokenId = null, estrellaRep = 0, estrellaSrv = 0, artics = [], estArt = {};
 const LABELS = ['','😞 Malo','😐 Regular','🙂 Bien','😊 Muy bien','🤩 Excelente'];
 function crearEstrellas(containerId, tipo) {
   const cont = $(containerId); cont.innerHTML = '';
@@ -212,9 +213,20 @@ function seleccionarEstrella(tipo, val) {
 window.enviarResena = async () => {
   if (!estrellaRep || !estrellaSrv) { $('errResena').style.display = 'block'; return; }
   const btn = $('btnEnviar'); btn.disabled = true; btn.textContent = 'Enviando…';
-  const { error } = await sb.rpc('res_enviar', { p_token: tokenId, p_rep: estrellaRep, p_srv: estrellaSrv, p_comentario: $('comentario').value.trim() });
+  const lista = Object.entries(estArt).map(([v, e]) => ({ variante_id: v, estrellas: e }));
+  const { error } = await sb.rpc('res_enviar_art', { p_token: tokenId, p_rep: estrellaRep, p_srv: estrellaSrv, p_comentario: $('comentario').value.trim(), p_articulos: lista });
   if (error) { btn.disabled = false; btn.textContent = '⭐ Enviar mi calificación'; alert(error.message || 'Error al enviar. Intenta de nuevo.'); return; }
   mostrar('pGracias');
+};
+function pintarArticulos() {
+  const sec = $('seccionArticulos'); if (!artics.length) { sec.style.display = 'none'; return; }
+  sec.style.display = 'block';
+  $('listaArticulosRes').innerHTML = artics.map(a => `<div style="margin:0.6rem 0;"><div style="font-weight:700;font-size:0.85rem;text-align:center;">${String(a.nombre || '').replace(/[<>&]/g, '')}</div>
+    <div class="stars-container" style="margin:0.2rem 0;" data-v="${a.variante_id}">${[1,2,3,4,5].map(i => `<button class="star-btn inactiva" data-val="${i}" onclick="calificarArticulo('${a.variante_id}',${i})">⭐</button>`).join('')}</div></div>`).join('');
+}
+window.calificarArticulo = (v, val) => {
+  estArt[v] = (estArt[v] === val) ? 0 : val; if (!estArt[v]) delete estArt[v];
+  document.querySelectorAll('[data-v="' + v + '"] .star-btn').forEach(b => { b.className = parseInt(b.dataset.val) <= (estArt[v] || 0) ? 'star-btn activa' : 'star-btn inactiva'; });
 };
 function mostrar(id) { document.querySelectorAll('.pantalla').forEach(p => p.classList.remove('activa')); $(id).classList.add('activa'); }
 async function init() {
@@ -227,7 +239,7 @@ async function init() {
   if (data.estado === 'expirada') { $('errorMsg').textContent = 'Este link expiró (válido 7 días). Si deseas calificar, contáctanos.'; mostrar('pError'); return; }
   $('saludo').textContent = data.cliente ? '¡Hola ' + data.cliente + '! 👋' : '¡Hola! 👋';
   $('infoProducto').textContent = data.producto ? 'Pedido: ' + data.producto : 'Cuéntanos cómo estuvo tu experiencia';
-  crearEstrellas('starsRep', 'rep'); crearEstrellas('starsSrv', 'srv'); mostrar('pFormulario');
+  artics = data.articulos || []; pintarArticulos(); crearEstrellas('starsRep', 'rep'); crearEstrellas('starsSrv', 'srv'); mostrar('pFormulario');
 }
 init();
 </script>
