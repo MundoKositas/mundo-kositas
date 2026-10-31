@@ -502,6 +502,10 @@ select.form-control{
         <label class="form-label">Teléfono WhatsApp *</label>
         <input type="tel" id="chkTel" class="form-control" placeholder="618 000 0000">
       </div>
+      <div class="form-group" id="grpMisDom" style="display:none;">
+        <label class="form-label">Mis domicilios</label>
+        <select id="chkMisDom" class="form-control" onchange="elegirMiDomicilio()"></select>
+      </div>
       <div class="form-group">
         <label class="form-label">Domicilio *</label>
         <input type="text" id="chkDomicilio" class="form-control" placeholder="Calle y número">
@@ -862,7 +866,30 @@ window.abrirCheckout = () => {
     if (u.colonia && !$('chkColonia').value && ![...$('chkColonia').options].some(o => o.value === u.colonia)) $('chkColoniaOtra').value = u.colonia;
     else if (u.colonia && !$('chkColonia').value) $('chkColonia').value = u.colonia; }
   if (tel) $('chkTel').value = tel;
+  cargarMisDomicilios();
   actualizarResumenCheckout(); abrirModal('modalCheckout');
+};
+// Domicilios guardados: solo se ofrecen en dispositivos ya verificados para ese teléfono
+let misDom = [];
+async function cargarMisDomicilios() {
+  $('grpMisDom').style.display = 'none'; misDom = [];
+  if (!tel || !tokens().length) return;
+  const { data } = await sb.rpc('cat_mis_domicilios', { p_telefono: tel, p_tokens: tokens() });
+  misDom = data || []; if (!misDom.length) return;
+  $('chkMisDom').innerHTML = misDom.map((d, i) => `<option value="${i}">${esc((d.alias ? d.alias + ': ' : '') + d.domicilio + (d.colonia ? ', ' + d.colonia : ''))}</option>`).join('') + '<option value="otro">➕ Otro domicilio (escribirlo abajo)</option>';
+  $('grpMisDom').style.display = 'block';
+  if ($('chkDomicilio').value.trim() === '' || misDom.some(d => norm(d.domicilio) === norm($('chkDomicilio').value))) {
+    const i = misDom.findIndex(d => norm(d.domicilio) === norm($('chkDomicilio').value)); $('chkMisDom').value = i >= 0 ? String(i) : '0'; elegirMiDomicilio();
+  } else $('chkMisDom').value = 'otro';
+}
+window.elegirMiDomicilio = () => {
+  const v = $('chkMisDom').value;
+  if (v === 'otro') { $('chkDomicilio').value = ''; $('chkColonia').value = ''; $('chkColoniaOtra').value = ''; $('chkDomicilio').focus(); actualizarResumenCheckout(); return; }
+  const d = misDom[Number(v)]; if (!d) return;
+  $('chkDomicilio').value = d.domicilio || '';
+  const op = [...$('chkColonia').options].find(o => norm(o.value) === norm(d.colonia || ''));
+  if (op) { $('chkColonia').value = op.value; $('chkColoniaOtra').value = ''; } else { $('chkColonia').value = ''; $('chkColoniaOtra').value = d.colonia || ''; }
+  actualizarResumenCheckout();
 };
 function actualizarResumenCheckout() {
   const sub = subtotalCarrito(); envioActual = costoEnvio(); const total = sub + envioActual;

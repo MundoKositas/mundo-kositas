@@ -288,13 +288,25 @@ async function cargar(primera) {
 function pedidosOrdenados() { return rutaOrden.map(id => datos.pedidos.find(p => p.id === id)).filter(Boolean); }
 function textoItems(p) { return (p.items || []).map(it => it.nombre + (it.cantidad > 1 ? ' x' + it.cantidad : '')).join(' · ') || '—'; }
 
+function cerradosHtml() {
+  const c = datos.cerrados || []; if (!c.length) return '';
+  return '<div style="margin-top:1rem;font-weight:800;font-size:0.82rem;color:var(--gris);">No entregados / cancelados</div>' + c.map(p => {
+    const nota = p.estado === 'noentregado'
+      ? (p.pendiente ? '⏳ Regresa los productos a caja: mientras no se cancele la venta, sigue en tu cuenta.' : 'Sin cargo en tu cuenta.')
+      : (p.cancelado_por === 'caja' ? '✔ Cancelado en caja: ya se quitó de tu cuenta.' : 'Cancelado.');
+    return `<div class="pedido-card cerrado" style="opacity:0.92;border-left:4px solid ${p.pendiente ? 'var(--naranja)' : 'var(--gris)'};">
+      <div style="display:flex;justify-content:space-between;gap:0.5rem;"><div style="font-weight:800;font-size:0.9rem;">${esc(p.codigo)} · ${esc(p.nombre || '')}</div><div style="font-weight:900;">${money(p.total)}</div></div>
+      <div style="font-size:0.78rem;color:var(--rojo);font-weight:700;">${p.estado === 'noentregado' ? '⚠️ No entregado' : '❌ Cancelado'}${p.motivo ? ': ' + esc(p.motivo) : ''}</div>
+      <div style="font-size:0.74rem;color:var(--gris);font-weight:600;margin-top:0.2rem;">${nota}</div></div>`;
+  }).join('');
+}
 function renderPedidos() {
   const lista = pedidosOrdenados();
   $('repContador').textContent = lista.length + ' pedido' + (lista.length !== 1 ? 's' : '');
   const av = $('avisoPedidosFuturos');
   if (datos.futuros) { av.textContent = '📅 Tienes ' + datos.futuros + ' pedido(s) para días siguientes'; av.style.display = 'block'; } else av.style.display = 'none';
   const cont = $('listaMisPedidos');
-  if (!lista.length) { cont.innerHTML = '<div class="empty"><div class="empty-icon">✅</div><div class="empty-text">Sin pedidos pendientes</div></div>'; return; }
+  if (!lista.length) { cont.innerHTML = '<div class="empty"><div class="empty-icon">✅</div><div class="empty-text">Sin pedidos pendientes</div></div>' + cerradosHtml(); return; }
   cont.innerHTML = '<div style="font-size:0.72rem;color:var(--gris);font-weight:700;margin-bottom:0.5rem;">↕️ Toca ↑ ↓ para ordenar tu ruta</div>' + lista.map((p, idx) => {
     const mapsQ = encodeURIComponent((p.domicilio || '') + (p.colonia ? ' ' + p.colonia : '') + ' Durango');
     const cambio = p.metodo_pago !== 'transferencia' && p.paga_con && Number(p.paga_con) > Number(p.total) ? Number(p.paga_con) - Number(p.total) : 0;
@@ -325,7 +337,7 @@ function renderPedidos() {
         <a href="https://maps.google.com/?q=${mapsQ}" target="_blank" rel="noopener" class="btn-sm btn-azul">🗺️ Mapa</a>
         ${p.telefono ? `<button class="btn-sm" id="camino-${p.id}" onclick="voyEnCamino('${p.id}')" style="background:#25D366;color:white;">🚀 Voy en camino</button>` : ''}
       </div></div>`;
-  }).join('');
+  }).join('') + cerradosHtml();
 }
 window.moverRuta = (idx, dir) => {
   const n = idx + dir; if (n < 0 || n >= rutaOrden.length) return;
