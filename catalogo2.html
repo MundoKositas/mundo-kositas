@@ -955,6 +955,7 @@ function cardPedido(p, pend) {
       <div style="font-weight:800;font-size:0.9rem;">${esc(p.codigo)}<div style="font-weight:600;font-size:0.78rem;color:var(--gris);">${esc(prods)}</div></div>
       <span class="badge ${b[0]}">${b[1]}</span></div>
     <div style="font-size:0.78rem;color:var(--gris);font-weight:600;">📍 ${esc(p.domicilio)}, ${esc(p.colonia)}</div>
+    ${p.motivo_no_entrega && (p.estado === 'noentregado' || p.estado === 'cancelado') ? `<div style="font-size:0.78rem;color:var(--rojo);font-weight:700;margin-top:0.2rem;">⚠️ No se pudo entregar: ${esc(p.motivo_no_entrega)}</div>` : ''}
     ${p.hora_desde ? `<div style="font-size:0.78rem;color:var(--gris);font-weight:600;">⏰ ${esc(p.hora_desde)} – ${esc(p.hora_hasta || '')}</div>` : ''}
     <div style="display:flex;justify-content:space-between;align-items:center;margin-top:0.4rem;">
       <div style="font-size:1.1rem;font-weight:900;color:var(--rojo);">${money(p.total)}</div>
