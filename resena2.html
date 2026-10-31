@@ -45,13 +45,13 @@ body{font-family:var(--font);background:var(--bg);color:var(--gris-dark);
 
 /* ESTRELLAS */
 .stars-container{
-  display:flex;justify-content:center;gap:0.5rem;
+  display:flex;justify-content:center;gap:0.15rem;flex-wrap:nowrap;max-width:100%;
   margin:1rem 0 0.5rem;
 }
 .star-btn{
-  font-size:2.5rem;cursor:pointer;
+  font-size:clamp(1.7rem,9vw,2.3rem);cursor:pointer;
   transition:transform 0.15s;
-  background:none;border:none;padding:0 0.1rem;
+  background:none;border:none;padding:0;min-width:0;
   line-height:1;
 }
 .star-btn:active{transform:scale(0.9);}
@@ -168,12 +168,12 @@ textarea.form-control{resize:vertical;min-height:90px;line-height:1.5;}
       Seguimos trabajando para darte la mejor experiencia 🏠💜
     </div>
     <div style="margin-top:1.5rem;text-align:center;">
-      <a href="https://wa.me/526182597230"
+      <a href="catalogo2.html"
          style="display:inline-flex;align-items:center;gap:0.5rem;
                 background:#25D366;color:white;border-radius:999px;
                 padding:0.7rem 1.5rem;font-weight:800;font-size:0.9rem;
                 text-decoration:none;">
-        💬 Hacer otro pedido
+        🛍️ Hacer otro pedido
       </a>
     </div>
   </div>

@@ -257,7 +257,12 @@ const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const money = n => '$' + (Number(n) || 0).toLocaleString('es-MX', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 const token = new URLSearchParams(location.search).get('token');
-let datos = null, rutaOrden = [], timer = null, nombreRep = 'Repartidor';
+let datos = null, timer = null, nombreRep = 'Repartidor';
+const hoyLocal = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+const claveRuta = 'mk_ruta_' + (token || '').slice(0, 12) + '_' + hoyLocal();
+function leerRuta() { try { const a = JSON.parse(localStorage.getItem(claveRuta) || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; } }
+function guardarRuta() { try { localStorage.setItem(claveRuta, JSON.stringify(rutaOrden)); } catch (e) { /* sin almacenamiento */ } }
+let rutaOrden = leerRuta();
 
 function mostrarError(titulo, desc) { $('cargando').style.display = 'none'; $('pantallaError').style.display = 'flex'; $('errorTitulo').textContent = titulo; $('errorDesc').textContent = desc; }
 function normErr(e) { return (e && e.message) ? e.message : String(e); }
@@ -272,6 +277,7 @@ async function cargar(primera) {
   // conserva el orden de ruta que ya armó el repartidor; lo nuevo se agrega al final
   const ids = data.pedidos.map(p => p.id);
   rutaOrden = rutaOrden.filter(id => ids.includes(id)).concat(ids.filter(id => !rutaOrden.includes(id)));
+  guardarRuta();
   if (primera) {
     $('repNombre').textContent = nombreRep;
     $('repFecha').textContent = new Date().toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' });
@@ -323,20 +329,30 @@ function renderPedidos() {
 }
 window.moverRuta = (idx, dir) => {
   const n = idx + dir; if (n < 0 || n >= rutaOrden.length) return;
-  [rutaOrden[idx], rutaOrden[n]] = [rutaOrden[n], rutaOrden[idx]]; renderPedidos();
+  [rutaOrden[idx], rutaOrden[n]] = [rutaOrden[n], rutaOrden[idx]]; guardarRuta(); renderPedidos();
 };
 
+const MSG_DEF = {
+  entregado: '📦 ¡Entregado! Gracias [Nombre] 💛\nFue un gusto atenderte en Mundo Kositas 🏠\n¿Todo llegó bien? Escríbenos 😊\n\n⭐ ¿Cómo estuvo tu experiencia?\nCalifica nuestro servicio aquí 👇\n[Link]',
+  noEntregado: 'Hola [Nombre], pasamos a dejar tu pedido [Codigo] de Mundo Kositas 🛵 pero no fue posible entregarlo.\nMotivo: [Motivo]\n\nSi todavía lo quieres, respóndenos por aquí y lo volvemos a programar 😊',
+};
+function plantilla(clave) { const m = datos && datos.mensajes && datos.mensajes[clave]; return String(m || MSG_DEF[clave]); }
+function armarMensaje(txt, v) {
+  return String(txt).replace(/\[Nombre\]/gi, v.nombre || '').replace(/\[Productos\]/gi, v.productos || '').replace(/\[Total\]/gi, v.total || '').replace(/\[Codigo\]/gi, v.codigo || '')
+    .replace(/\[Minutos\]/gi, v.minutos || '').replace(/\[Motivo\]/gi, v.motivo || '').replace(/\[Link\]/gi, v.link || '').replace(/\\n/g, '\n');
+}
 function abrirWhatsApp(tel, texto) { window.open('https://wa.me/52' + String(tel).replace(/\D/g, '').slice(-10) + '?text=' + encodeURIComponent(texto), '_blank'); }
 
 window.marcarEntregado = async id => {
   if (!confirm('¿Confirmas que el pedido fue entregado?')) return;
+  const ped = datos.pedidos.find(x => x.id === id);
   const { data, error } = await sb.rpc('rep_marcar', { p_token: token, p_pedido_id: id, p_accion: 'entregado' });
   if (error) { alert(normErr(error)); return; }
+  const tpl = plantilla('entregado');
   await cargar(false);
   if (data && data.telefono) {
     const base = location.origin + location.pathname.replace(/[^/]*$/, '');
-    const msg = '📦 ¡Entregado! Gracias ' + (data.nombre || '') + ' 💛\nFue un gusto atenderte en Mundo Kositas 🏠\n¿Todo llegó bien? Escríbenos 😊\n\n⭐ ¿Cómo estuvo tu experiencia?\nCalifica nuestro servicio aquí 👇\n' + base + 'resena2.html?token=' + data.resena_token;
-    abrirWhatsApp(data.telefono, msg);
+    abrirWhatsApp(data.telefono, armarMensaje(tpl, { nombre: data.nombre, codigo: data.codigo, productos: ped ? textoItems(ped).replace(/ · /g, ', ') : '', total: ped ? Number(ped.total).toLocaleString('es-MX') : '', link: base + 'resena2.html?token=' + data.resena_token }));
   }
 };
 window.abrirNoEntregado = id => {
@@ -349,10 +365,13 @@ window.confirmarNoEntregado = async () => {
   const id = $('nePedidoId').value, checked = document.querySelector('input[name="neMotivo"]:checked');
   if (!checked) { alert('Selecciona un motivo.'); return; }
   const motivo = checked.value === 'otro' ? ($('neMotivoOtro').value.trim() || 'Otro') : checked.value;
-  const { error } = await sb.rpc('rep_marcar', { p_token: token, p_pedido_id: id, p_accion: 'noentregado', p_motivo: motivo });
+  const ped = datos.pedidos.find(x => x.id === id);
+  const { data, error } = await sb.rpc('rep_marcar', { p_token: token, p_pedido_id: id, p_accion: 'noentregado', p_motivo: motivo });
   if (error) { alert(normErr(error)); return; }
+  const tpl = plantilla('noEntregado');
   cerrarModal(); await cargar(false);
-  alert('Anotado. Regresa los productos a la tienda y avisa en caja para cancelar la venta de ese pedido.');
+  alert('Anotado. Regresa los productos a la tienda y avisa en caja para cancelar la venta de ese pedido. Ahora se abre WhatsApp para avisarle al cliente.');
+  if (data && data.telefono) abrirWhatsApp(data.telefono, armarMensaje(tpl, { nombre: data.nombre, codigo: data.codigo, motivo: data.motivo, productos: ped ? textoItems(ped).replace(/ · /g, ', ') : '', total: ped ? Number(ped.total).toLocaleString('es-MX') : '' }));
 };
 window.cerrarModal = () => $('modalNoEnt').classList.remove('open');
 $('modalNoEnt').addEventListener('click', e => { if (e.target === $('modalNoEnt')) cerrarModal(); });
@@ -383,7 +402,7 @@ window.voyEnCamino = async id => {
   }
   const plantilla = (datos.mensajes && datos.mensajes.voyEnCamino) || '🏠 Hola [Nombre], soy el repartidor de Mundo Kositas 🛵\nSigue su pedido: [Productos]\nTotal a pagar: $[Total]\n\nEstoy en camino, llego aproximadamente en [Minutos] minutos 📍\n¡Favor de estar al pendiente! 😊';
   const productos = (p.items || []).map(it => it.nombre + (it.cantidad > 1 ? ' x' + it.cantidad : '')).join(', ');
-  const msg = plantilla.replace(/\[Nombre\]/gi, p.nombre || '').replace(/\[Productos\]/gi, productos).replace(/\[Total\]/gi, Number(p.total).toLocaleString('es-MX')).replace(/\[Minutos\]/gi, minutos ? String(minutos) : '??').replace(/\\n/g, '\n');
+  const msg = armarMensaje(plantilla, { nombre: p.nombre, productos, total: Number(p.total).toLocaleString('es-MX'), codigo: p.codigo, minutos: minutos ? String(minutos) : '??' });
   sb.rpc('rep_marcar', { p_token: token, p_pedido_id: id, p_accion: 'camino' });
   abrirWhatsApp(p.telefono, msg);
   if (btn) { btn.textContent = '🚀 Voy en camino'; btn.disabled = false; }
