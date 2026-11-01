@@ -1001,9 +1001,28 @@ function cardPedido(p, pend) {
     <div style="display:flex;justify-content:space-between;align-items:center;margin-top:0.4rem;">
       <div style="font-size:1.1rem;font-weight:900;color:var(--rojo);">${money(p.total)}</div>
       <div style="font-size:0.72rem;color:var(--gris);font-weight:700;">${fecha}</div></div>
+    ${p.items && p.items.some(i => i.variante_id) ? `<button class="btn-sm btn-sm-rojo" style="margin-top:0.5rem;background:#16a34a;" onclick="volverAPedir('${esc(p.codigo)}')">🔁 Volver a pedir</button>` : ''}
     ${pend && p.estado === 'nuevo' ? `<button class="btn-sm btn-sm-rojo" style="margin-top:0.5rem;" onclick="cancelarPedido('${esc(p.codigo)}')">❌ Cancelar pedido</button>` : ''}
   </div>`;
 }
+window.volverAPedir = codigo => {
+  const p = pedidosCache.find(x => x.codigo === codigo); if (!p) return;
+  const nuevos = [], faltan = [];
+  (p.items || []).forEach(it => {
+    const v = it.variante_id && buscarVariante(it.variante_id), a = v && articuloDeVariante(it.variante_id);
+    if (v && v.disponible) nuevos.push({ varianteId: v.id, prodId: a.id, nombre: a.nombre, variante: v.nombre || '', precio: v.precio, cantidad: Math.min(99, Math.max(1, Number(it.cantidad) || 1)), img: fotoDe(a) });
+    else faltan.push(it.nombre);
+  });
+  if (!nuevos.length) { mostrarToast('Esos artículos ya no están disponibles'); return; }
+  carrito = nuevos; guardarCarrito();
+  $('chkNombre').value = p.nombre || ''; $('chkDomicilio').value = p.domicilio || '';
+  if (p.colonia && [...$('chkColonia').options].some(o => o.value === p.colonia)) { $('chkColonia').value = p.colonia; $('chkColoniaOtra').value = ''; }
+  else { $('chkColonia').value = ''; $('chkColoniaOtra').value = p.colonia || ''; }
+  $('chkMetodo').value = p.metodo_pago === 'transferencia' ? 'transferencia' : 'efectivo'; toggleBanco();
+  abrirCheckout();
+  if (faltan.length) mostrarToast('No disponibles ahora: ' + faltan.join(', '));
+  else mostrarToast('Revisa tu pedido y confírmalo 🛒');
+};
 window.cancelarPedido = async codigo => {
   if (!confirm('¿Seguro que deseas cancelar este pedido?')) return;
   const { data } = await sb.rpc('cat_cancelar_pedido', { p_codigo: codigo, p_telefono: tel, p_tokens: tokens() });
