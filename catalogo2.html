@@ -898,6 +898,7 @@ window.abrirCheckout = () => {
     else if (u.colonia && !$('chkColonia').value) $('chkColonia').value = u.colonia; }
   if (tel) $('chkTel').value = tel;
   cargarMisDomicilios();
+  if (yaCerroHoy() && $('chkFecha').value === hoyISO()) { $('chkFecha').value = mananaISO(); mostrarToast('Ya cerramos entregas de hoy: tu pedido quedó para mañana 📅'); }
   actualizarHintHorario();
   actualizarResumenCheckout(); abrirModal('modalCheckout');
 };
@@ -959,7 +960,12 @@ function rangoEntrega(fechaISO) {
   const desde = dom ? cfg.horario_dom_desde : cfg.horario_desde, hasta = dom ? cfg.horario_dom_hasta : cfg.horario_hasta;
   return desde && hasta ? { desde: String(desde).slice(0, 5), hasta: String(hasta).slice(0, 5), dom } : null;
 }
+const mananaISO = () => { const d = new Date(); d.setDate(d.getDate() + 1); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+const horaAhora = () => { const n = new Date(); return String(n.getHours()).padStart(2, '0') + ':' + String(n.getMinutes()).padStart(2, '0'); };
+function yaCerroHoy() { const r = rangoEntrega(hoyISO()); return !!(r && horaAhora() >= r.hasta); }
+window.elegirManana = () => { $('chkFecha').value = mananaISO(); $('chkHoraDesde').value = ''; $('chkHoraHasta').value = ''; actualizarHintHorario(); actualizarResumenCheckout(); };
 function errorHorario() {
+  if ($('chkFecha').value === hoyISO() && yaCerroHoy()) return 'Ya cerramos las entregas de hoy (hasta las ' + rangoEntrega(hoyISO()).hasta + '). Puedes programar tu pedido para mañana.';
   const r = rangoEntrega($('chkFecha').value); if (!r) return '';
   const d = $('chkHoraDesde').value, h = $('chkHoraHasta').value;
   if ((d && !h) || (!d && h)) return 'Elige la hora de inicio y de fin de tu entrega.';
@@ -974,6 +980,8 @@ function actualizarHintHorario() {
   ['chkHoraDesde', 'chkHoraHasta'].forEach(id => { if (r) { $(id).min = r.desde; $(id).max = r.hasta; } else { $(id).removeAttribute('min'); $(id).removeAttribute('max'); } });
   const e = errorHorario();
   hint.style.color = e ? 'var(--rojo)' : 'var(--gris)';
+  hint.innerHTML = '';
+  if (e && yaCerroHoy() && $('chkFecha').value === hoyISO()) { hint.innerHTML = esc(e) + ' <button type="button" class="btn-sm btn-sm-rojo" onclick="elegirManana()">📅 Entregar mañana</button>'; return; }
   hint.textContent = e || (r ? `🕒 Horario de entrega ${r.dom ? 'domingos' : 'entre semana'}: ${r.desde} a ${r.hasta}` : '');
 }
 ['chkFecha', 'chkHoraDesde', 'chkHoraHasta'].forEach(id => $(id).addEventListener('change', actualizarHintHorario));
