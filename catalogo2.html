@@ -614,7 +614,7 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth:
 let tel = null, cfg = {}, cat = { categorias: [], lineas: [], articulos: [], lista: {} };
 let carrito = [], prodActual = null, varIdx = 0, cantModal = 1, imgIdx = 0;
 function leerLista(k){ try{ const a = JSON.parse(lsGet(k) || '[]'); return Array.isArray(a) ? a : []; }catch(e){ return []; } }
-const tokens = () => leerLista('mk_tokens'), codigosOk = () => leerLista('mk_codigos');
+const nipTokens = () => leerLista('mk_nip_tokens'), tokens = () => leerLista('mk_tokens'), codigosOk = () => leerLista('mk_codigos');
 function agregarLista(k, v){ const a = leerLista(k); if (!a.includes(v)) { a.push(v); lsSet(k, JSON.stringify(a.slice(-40))); } }
 let catSel = null, linSel = null, pedidosCache = [], envioActual = 0, timerPedidos = null;
 
@@ -667,18 +667,35 @@ async function cargarResenasArticulos() {
 const estrellasHtml = id => { const r = resArt[id]; return r ? `<div class="prod-variantes" style="color:#b45309;">⭐ ${Number(r.promedio).toFixed(1)} <span style="color:var(--gris);">(${r.n} ${r.n === 1 ? 'reseña' : 'reseñas'})</span></div>` : ''; };
 async function cargarCatalogo() {
   $('listaCats').innerHTML = '<div class="loading">Cargando…</div>';
-  const { data, error } = await sb.rpc('cat_catalogo', { p_telefono: tel });
+  const { data, error } = await sb.rpc('cat_catalogo', { p_telefono: tel, p_nip_tokens: nipTokens() });
   if (error || !data) {
     $('listaCats').innerHTML = '<div class="loading" style="grid-column:1/-1;">No pudimos cargar el catálogo. Revisa tu internet e intenta de nuevo.</div>';
     return;
   }
   cat = data;
+  pintarBannerNip();
   cargarResenasArticulos();
   // precios del carrito se alinean a la lista vigente
   carrito.forEach(i => { const v = buscarVariante(i.varianteId); if (v) i.precio = v.precio; });
   $('headerSaludo').textContent = (tel ? '📱 ' + tel : 'Invitado') + (cat.lista && cat.lista.especial ? ' · ⭐ Precios especiales' : '');
   mostrarNivel(catSel ? 'lineas' : 'cats');
 }
+// Precios especiales (mayoreo): se desbloquean con el NIP que da la tienda
+function pintarBannerNip() {
+  let b = $('bannerNip');
+  if (!b) { b = document.createElement('div'); b.id = 'bannerNip'; b.style.cssText = 'background:#fff7e6;border:1px solid #f59e0b;border-radius:12px;padding:0.7rem 0.8rem;margin:0 0 0.7rem;font-size:0.82rem;font-weight:700;'; $('pagCatalogo').insertBefore(b, $('pagCatalogo').firstChild); }
+  if (!(cat && cat.lista && cat.lista.requiere_nip)) { b.style.display = 'none'; return; }
+  b.style.display = 'block';
+  b.innerHTML = '🔑 ¿Eres cliente de mayoreo? Escribe tu NIP para ver tus precios.<div style="display:flex;gap:0.4rem;margin-top:0.4rem;"><input type="tel" id="nipInput" maxlength="8" inputmode="numeric" placeholder="NIP" style="flex:1;padding:0.5rem;border:1px solid #ddd;border-radius:8px;font-size:1rem;"><button class="btn-sm btn-sm-rojo" onclick="verificarNip()">Ver mis precios</button></div><div id="nipError" style="color:var(--rojo);margin-top:0.3rem;"></div><div style="font-weight:600;color:var(--gris);margin-top:0.2rem;">¿No tienes NIP? Pídelo por WhatsApp.</div>';
+}
+window.verificarNip = async () => {
+  const nip = $('nipInput').value.trim(), e = $('nipError'); e.textContent = '';
+  if (!nip) { e.textContent = 'Escribe tu NIP.'; return; }
+  const { data, error } = await sb.rpc('cat_verificar_nip', { p_telefono: tel, p_nip: nip });
+  if (error) { e.textContent = error.message; return; }
+  if (!data) { e.textContent = 'NIP incorrecto. Revisa o pídelo por WhatsApp.'; return; }
+  agregarLista('mk_nip_tokens', data); mostrarToast('Listo, ya ves tus precios 🎉'); await cargarCatalogo();
+};
 function buscarVariante(id) {
   for (const a of cat.articulos) { const v = a.variantes.find(x => x.id === id); if (v) return v; }
   return null;
@@ -881,6 +898,7 @@ window.abrirCheckout = () => {
     else if (u.colonia && !$('chkColonia').value) $('chkColonia').value = u.colonia; }
   if (tel) $('chkTel').value = tel;
   cargarMisDomicilios();
+  actualizarHintHorario();
   actualizarResumenCheckout(); abrirModal('modalCheckout');
 };
 // Domicilios guardados: solo se ofrecen en dispositivos ya verificados para ese teléfono
@@ -935,6 +953,30 @@ async function comprimirImagen(file, maxPx = 600, calidad = 0.8) {
     r.onerror = reject; r.readAsDataURL(file);
   });
 }
+// Horario de entrega configurado en Admin → Reparto → Datos del servicio
+function rangoEntrega(fechaISO) {
+  const f = fechaISO ? new Date(fechaISO + 'T12:00:00') : new Date(), dom = f.getDay() === 0;
+  const desde = dom ? cfg.horario_dom_desde : cfg.horario_desde, hasta = dom ? cfg.horario_dom_hasta : cfg.horario_hasta;
+  return desde && hasta ? { desde: String(desde).slice(0, 5), hasta: String(hasta).slice(0, 5), dom } : null;
+}
+function errorHorario() {
+  const r = rangoEntrega($('chkFecha').value); if (!r) return '';
+  const d = $('chkHoraDesde').value, h = $('chkHoraHasta').value;
+  if ((d && !h) || (!d && h)) return 'Elige la hora de inicio y de fin de tu entrega.';
+  if (d && h && d >= h) return 'La hora de fin debe ser después de la hora de inicio.';
+  if ((d && d < r.desde) || (h && h > r.hasta)) return `Entregamos ${r.dom ? 'los domingos' : 'entre semana'} de ${r.desde} a ${r.hasta}. Elige un horario dentro de ese rango.`;
+  if ($('chkFecha').value === hoyISO() && h) { const n = new Date(), ahora = String(n.getHours()).padStart(2, '0') + ':' + String(n.getMinutes()).padStart(2, '0'); if (h <= ahora) return 'Ese horario de hoy ya pasó. Elige una hora posterior o cambia la fecha.'; }
+  return '';
+}
+function actualizarHintHorario() {
+  const r = rangoEntrega($('chkFecha').value); let hint = $('chkHorarioHint');
+  if (!hint) { hint = document.createElement('p'); hint.id = 'chkHorarioHint'; hint.style.cssText = 'font-size:.78rem;font-weight:700;margin:4px 0 8px;'; const box = $('chkHoraHasta').parentElement; (box.parentElement || box).insertAdjacentElement('afterend', hint); }
+  ['chkHoraDesde', 'chkHoraHasta'].forEach(id => { if (r) { $(id).min = r.desde; $(id).max = r.hasta; } else { $(id).removeAttribute('min'); $(id).removeAttribute('max'); } });
+  const e = errorHorario();
+  hint.style.color = e ? 'var(--rojo)' : 'var(--gris)';
+  hint.textContent = e || (r ? `🕒 Horario de entrega ${r.dom ? 'domingos' : 'entre semana'}: ${r.desde} a ${r.hasta}` : '');
+}
+['chkFecha', 'chkHoraDesde', 'chkHoraHasta'].forEach(id => $(id).addEventListener('change', actualizarHintHorario));
 window.enviarPedido = async () => {
   const err = $('chkError'); err.classList.remove('show');
   const fallo = m => { err.textContent = m; err.classList.add('show'); err.scrollIntoView({ block: 'nearest' }); };
@@ -943,6 +985,7 @@ window.enviarPedido = async () => {
   if (t.length !== 10) return fallo('Ingresa tu número de WhatsApp (10 dígitos).');
   if (!dom) return fallo('Ingresa tu domicilio.');
   if (!col) return fallo('Selecciona o escribe tu colonia.');
+  const eh = errorHorario(); if (eh) { actualizarHintHorario(); return fallo(eh); }
   const metodo = $('chkMetodo').value, total = subtotalCarrito() + costoEnvio();
   const pagaCon = metodo === 'efectivo' ? Number($('chkPagaCon').value) || null : null;
   if (pagaCon && pagaCon < total) return fallo('El monto con el que pagas debe cubrir el total (' + money(total) + ').');
@@ -953,7 +996,7 @@ window.enviarPedido = async () => {
     const { data, error } = await sb.rpc('cat_crear_pedido', { p: {
       nombre, telefono: t, domicilio: dom, colonia: col, metodo_pago: metodo, paga_con: pagaCon, comprobante,
       fecha_entrega: $('chkFecha').value || null, hora_desde: $('chkHoraDesde').value || null, hora_hasta: $('chkHoraHasta').value || null,
-      notas: $('chkNotas').value.trim(), items: carrito.map(i => ({ variante_id: i.varianteId, cantidad: i.cantidad })) } });
+      notas: $('chkNotas').value.trim(), nip_tokens: nipTokens(), items: carrito.map(i => ({ variante_id: i.varianteId, cantidad: i.cantidad })) } });
     if (error) throw error;
     tel = t; lsSet('mk_tel', tel); if (data.token) agregarLista('mk_tokens', data.token); $('headerSaludo').textContent = '📱 ' + tel;
     const resumen = (data.items || []).map(i => `${i.cantidad} x ${i.nombre}`).join('\n');
