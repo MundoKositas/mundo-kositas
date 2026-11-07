@@ -255,7 +255,7 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const money = n => '$' + (Number(n) || 0).toLocaleString('es-MX', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+const money = n => '$' + (Number(n) || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const token = new URLSearchParams(location.search).get('token');
 let datos = null, timer = null, nombreRep = 'Repartidor';
 const hoyLocal = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
@@ -364,7 +364,7 @@ window.marcarEntregado = async id => {
   await cargar(false);
   if (data && data.telefono) {
     const base = location.origin + location.pathname.replace(/[^/]*$/, '');
-    abrirWhatsApp(data.telefono, armarMensaje(tpl, { nombre: data.nombre, codigo: data.codigo, productos: ped ? textoItems(ped).replace(/ · /g, ', ') : '', total: ped ? Number(ped.total).toLocaleString('es-MX') : '', link: base + 'resena2.html?token=' + data.resena_token }));
+    abrirWhatsApp(data.telefono, armarMensaje(tpl, { nombre: data.nombre, codigo: data.codigo, productos: ped ? textoItems(ped).replace(/ · /g, ', ') : '', total: ped ? Number(ped.total).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '', link: base + 'resena2.html?token=' + data.resena_token }));
   }
 };
 window.abrirNoEntregado = id => {
@@ -383,7 +383,7 @@ window.confirmarNoEntregado = async () => {
   const tpl = plantilla('noEntregado');
   cerrarModal(); await cargar(false);
   alert('Anotado. Regresa los productos a la tienda y avisa en caja para cancelar la venta de ese pedido. Ahora se abre WhatsApp para avisarle al cliente.');
-  if (data && data.telefono) abrirWhatsApp(data.telefono, armarMensaje(tpl, { nombre: data.nombre, codigo: data.codigo, motivo: data.motivo, productos: ped ? textoItems(ped).replace(/ · /g, ', ') : '', total: ped ? Number(ped.total).toLocaleString('es-MX') : '' }));
+  if (data && data.telefono) abrirWhatsApp(data.telefono, armarMensaje(tpl, { nombre: data.nombre, codigo: data.codigo, motivo: data.motivo, productos: ped ? textoItems(ped).replace(/ · /g, ', ') : '', total: ped ? Number(ped.total).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '' }));
 };
 window.cerrarModal = () => $('modalNoEnt').classList.remove('open');
 $('modalNoEnt').addEventListener('click', e => { if (e.target === $('modalNoEnt')) cerrarModal(); });
@@ -414,7 +414,7 @@ window.voyEnCamino = async id => {
   }
   const plantilla = (datos.mensajes && datos.mensajes.voyEnCamino) || '🏠 Hola [Nombre], soy el repartidor de Mundo Kositas 🛵\nSigue su pedido: [Productos]\nTotal a pagar: $[Total]\n\nEstoy en camino, llego aproximadamente en [Minutos] minutos 📍\n¡Favor de estar al pendiente! 😊';
   const productos = (p.items || []).map(it => it.nombre + (it.cantidad > 1 ? ' x' + it.cantidad : '')).join(', ');
-  const msg = armarMensaje(plantilla, { nombre: p.nombre, productos, total: Number(p.total).toLocaleString('es-MX'), codigo: p.codigo, minutos: minutos ? String(minutos) : '??' });
+  const msg = armarMensaje(plantilla, { nombre: p.nombre, productos, total: Number(p.total).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), codigo: p.codigo, minutos: minutos ? String(minutos) : '??' });
   sb.rpc('rep_marcar', { p_token: token, p_pedido_id: id, p_accion: 'camino' });
   abrirWhatsApp(p.telefono, msg);
   if (btn) { btn.textContent = '🚀 Voy en camino'; btn.disabled = false; }
