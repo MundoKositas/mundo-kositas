@@ -172,6 +172,9 @@ select.form-control{
 .prod-body{padding:0.6rem 0.65rem 0.75rem;}
 .prod-nombre{font-size:0.82rem;font-weight:800;color:var(--gris-dark);margin-bottom:0.2rem;
   line-height:1.3;}
+.prod-img{position:relative;}
+.badge-pedido{position:absolute;left:6px;bottom:6px;right:6px;background:rgba(180,83,9,.93);color:#fff;font-size:.68rem;font-weight:800;line-height:1.2;text-align:center;border-radius:8px;padding:3px 6px;z-index:1;}
+.aviso-pedido{background:#fff7e6;border:1px solid #f59e0b;color:#92400e;border-radius:10px;padding:.55rem .7rem;font-size:.8rem;font-weight:700;margin:.5rem 0;}
 .prod-variantes{font-size:0.7rem;color:var(--gris);font-weight:600;margin-bottom:0.3rem;}
 .prod-precio{font-size:1.05rem;font-weight:900;color:var(--rojo);}
 .prod-add{display:block;width:100%;padding:0.45rem;border:none;
@@ -622,6 +625,16 @@ const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
 const money = n => '$' + (Number(n) || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const norm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+// ---- Sobre pedido: artículo sin existencia que se surte en N días ----
+const diasPedidoDe = a => { const n = Number(a && a.dias_pedido); return isFinite(n) && n >= 0 ? n : 3; };
+function sobrePedidoVar(varianteId) {
+  const v = buscarVariante(varianteId); if (!v || v.disponible) return 0;
+  const a = articuloDeVariante(varianteId); return diasPedidoDe(a) || 0;
+}
+function diasSobrePedidoCarrito() { return carrito.reduce((m, i) => Math.max(m, sobrePedidoVar(i.varianteId)), 0); }
+const sumarDiasISO = n => { const d = new Date(); d.setDate(d.getDate() + n); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+const fechaMinimaCarrito = () => sumarDiasISO(diasSobrePedidoCarrito());
+const textoDias = n => n === 1 ? '1 día' : n + ' días';
 const hoyISO = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
 function lsGet(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
 function lsSet(k, v){ try{ localStorage.setItem(k, v); }catch(e){} }
@@ -796,11 +809,11 @@ function renderProductos(arr, contId) {
     const disp = a.variantes.some(v => v.disponible);
     const nVars = a.variantes.filter(v => v.nombre).length;
     return `<div class="prod-card" onclick="abrirProducto('${a.id}')">
-      <div class="prod-img">${foto ? `<img src="${esc(foto)}" loading="lazy">` : '📦'}</div>
+      <div class="prod-img">${foto ? `<img src="${esc(foto)}" loading="lazy">` : '📦'}${disp ? '' : `<div class="badge-pedido">📦 Sobre pedido · entrega en ${textoDias(diasPedidoDe(a))}</div>`}</div>
       <div class="prod-body"><div class="prod-nombre">${esc(a.nombre)}</div>
         ${nVars > 1 ? `<div class="prod-variantes">${nVars} opciones</div>` : ''}${estrellasHtml(a.id)}
         <div class="prod-precio">${rangoPrecio(a)}</div>
-        <button class="prod-add" ${disp ? '' : 'disabled style="background:#bbb;"'}>${disp ? 'Ver / Agregar' : 'Agotado'}</button></div></div>`;
+        <button class="prod-add" ${disp ? '' : 'style="background:#b45309;"'}>${disp ? 'Ver / Agregar' : 'Pedir (sobre pedido)'}</button></div></div>`;
   }).join('');
 }
 
@@ -827,12 +840,16 @@ function pintarDetalle() {
   const hayVars = a.variantes.length > 1 || a.variantes[0].nombre;
   $('secVariantes').innerHTML = hayVars
     ? '<span class="variantes-label">Elige tu opción:</span><div class="variantes-row">' +
-      a.variantes.map((x, i) => `<button class="var-chip ${i === varIdx ? 'active' : ''}" ${x.disponible ? '' : 'style="opacity:.45;"'} onclick="seleccionarVar(${i})">${esc(x.nombre || 'Único')}${x.disponible ? '' : ' (agotado)'}</button>`).join('') + '</div>'
+      a.variantes.map((x, i) => `<button class="var-chip ${i === varIdx ? 'active' : ''}" ${x.disponible ? '' : 'style="opacity:.8;border-style:dashed;"'} onclick="seleccionarVar(${i})">${esc(x.nombre || 'Único')}${x.disponible ? '' : ' (sobre pedido)'}</button>`).join('') + '</div>'
     : '';
   $('cantModal').textContent = cantModal;
   $('subtotalModal').textContent = money(v.precio * cantModal);
   const btn = document.querySelector('#modalProducto .btn-rojo');
-  btn.disabled = !v.disponible; btn.textContent = v.disponible ? '🛒 Agregar al carrito' : 'Agotado';
+  btn.disabled = false; btn.textContent = v.disponible ? '🛒 Agregar al carrito' : '🛒 Pedir (sobre pedido)';
+  let av = $('avisoPedidoDet');
+  if (!av) { av = document.createElement('div'); av.id = 'avisoPedidoDet'; av.className = 'aviso-pedido'; $('subtotalModal').closest('div').parentElement.insertBefore(av, $('subtotalModal').closest('div')); }
+  av.style.display = v.disponible ? 'none' : 'block';
+  av.textContent = '📦 Sobre pedido: este artículo no está en existencia ahora. Te lo entregamos en ' + textoDias(diasPedidoDe(a)) + '.';
 }
 window.verImg = i => { imgIdx = i; pintarDetalle(); };
 window.moverImg = d => { const n = (prodActual && prodActual.imagenes || []).length; if (n < 2) return; imgIdx = (imgIdx + d + n) % n; pintarDetalle(); };
@@ -844,11 +861,11 @@ document.addEventListener('keydown', e => { if (prodActual && document.getElemen
 window.seleccionarVar = i => { varIdx = i; pintarDetalle(); };
 window.cambiarCantModal = d => { cantModal = Math.min(99, Math.max(1, cantModal + d)); pintarDetalle(); };
 window.agregarAlCarrito = () => {
-  const a = prodActual, v = a.variantes[varIdx]; if (!v.disponible) return;
+  const a = prodActual, v = a.variantes[varIdx];
   const ex = carrito.find(i => i.varianteId === v.id);
   if (ex) ex.cantidad = Math.min(99, ex.cantidad + cantModal);
   else carrito.push({ varianteId: v.id, prodId: a.id, nombre: a.nombre, variante: v.nombre || '', precio: v.precio, cantidad: cantModal, img: fotoDe(a) });
-  guardarCarrito(); cerrarModal('modalProducto'); mostrarToast('Agregado al carrito 🛒');
+  guardarCarrito(); cerrarModal('modalProducto'); mostrarToast('Agregado al carrito 🛒' + (v.disponible ? '' : ' · sobre pedido'));
 };
 
 // ---------- Carrito ----------
@@ -867,6 +884,7 @@ function renderCarrito() {
   c.innerHTML = carrito.map((i, idx) => `<div class="carrito-item">
       <div class="ci-img">${i.img ? `<img src="${esc(i.img)}">` : '📦'}</div>
       <div class="ci-info"><div class="ci-nombre">${esc(i.nombre)}</div>${i.variante ? `<div class="ci-variante">${esc(i.variante)}</div>` : ''}
+        ${sobrePedidoVar(i.varianteId) ? `<div class="ci-variante" style="color:#b45309;font-weight:800;">📦 Sobre pedido · ${textoDias(sobrePedidoVar(i.varianteId))}</div>` : ''}
         <div class="ci-precio">${money(i.precio * i.cantidad)}</div>
         <div style="display:flex;align-items:center;gap:0.4rem;margin-top:0.3rem;">
           <button onclick="cambiarCantCarrito(${idx},-1)" style="width:28px;height:28px;border-radius:8px;border:2px solid var(--border);background:var(--gris-light);font-weight:900;">−</button>
@@ -874,7 +892,8 @@ function renderCarrito() {
           <button onclick="cambiarCantCarrito(${idx},1)" style="width:28px;height:28px;border-radius:8px;border:2px solid var(--border);background:var(--gris-light);font-weight:900;">+</button></div></div>
       <button class="ci-remove" onclick="quitarDelCarrito(${idx})">🗑️</button></div>`).join('') +
     `<div class="carrito-resumen"><div class="resumen-row"><span>Productos (${carrito.reduce((s, i) => s + i.cantidad, 0)})</span><span>${money(subtotalCarrito())}</span></div>
-      <div class="resumen-row" style="color:var(--gris);font-size:0.78rem;"><span>El envío se calcula según tu colonia</span><span></span></div></div>
+      <div class="resumen-row" style="color:var(--gris);font-size:0.78rem;"><span>El envío se calcula según tu colonia</span><span></span></div>
+      ${diasSobrePedidoCarrito() ? `<div class="aviso-pedido">📦 Tu pedido incluye artículos sobre pedido: se entrega en ${textoDias(diasSobrePedidoCarrito())} (el que más tarda).</div>` : ''}</div>
      <button class="btn btn-rojo" onclick="abrirCheckout()">Continuar con el pedido →</button>`;
 }
 
@@ -898,10 +917,21 @@ window.abrirCheckout = () => {
     else if (u.colonia && !$('chkColonia').value) $('chkColonia').value = u.colonia; }
   if (tel) $('chkTel').value = tel;
   cargarMisDomicilios();
+  aplicarFechaMinima();
   if (yaCerroHoy() && $('chkFecha').value === hoyISO()) { $('chkFecha').value = mananaISO(); mostrarToast('Ya cerramos entregas de hoy: tu pedido quedó para mañana 📅'); }
   actualizarHintHorario();
   actualizarResumenCheckout(); abrirModal('modalCheckout');
 };
+// Fecha mínima de entrega = hoy + días del artículo sobre pedido que más tarda
+function aplicarFechaMinima() {
+  const min = fechaMinimaCarrito(), n = diasSobrePedidoCarrito(), f = $('chkFecha');
+  f.min = min;
+  if (!f.value || f.value < min) f.value = min;
+  let av = $('chkAvisoPedido');
+  if (!av) { av = document.createElement('div'); av.id = 'chkAvisoPedido'; av.className = 'aviso-pedido'; f.parentElement.appendChild(av); }
+  av.style.display = n ? 'block' : 'none';
+  av.textContent = n ? '📦 Tu pedido incluye artículos sobre pedido. La entrega más pronto es el ' + new Date(min + 'T12:00:00').toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' }) + '.' : '';
+}
 // Domicilios guardados: solo se ofrecen en dispositivos ya verificados para ese teléfono
 let misDom = [];
 async function cargarMisDomicilios() {
@@ -963,7 +993,7 @@ function rangoEntrega(fechaISO) {
 const mananaISO = () => { const d = new Date(); d.setDate(d.getDate() + 1); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
 const horaAhora = () => { const n = new Date(); return String(n.getHours()).padStart(2, '0') + ':' + String(n.getMinutes()).padStart(2, '0'); };
 function yaCerroHoy() { const r = rangoEntrega(hoyISO()); return !!(r && horaAhora() >= r.hasta); }
-window.elegirManana = () => { $('chkFecha').value = mananaISO(); $('chkHoraDesde').value = ''; $('chkHoraHasta').value = ''; actualizarHintHorario(); actualizarResumenCheckout(); };
+window.elegirManana = () => { $('chkFecha').value = mananaISO() < fechaMinimaCarrito() ? fechaMinimaCarrito() : mananaISO(); $('chkHoraDesde').value = ''; $('chkHoraHasta').value = ''; actualizarHintHorario(); actualizarResumenCheckout(); };
 function errorHorario() {
   if ($('chkFecha').value === hoyISO() && yaCerroHoy()) return 'Ya cerramos las entregas de hoy (hasta las ' + rangoEntrega(hoyISO()).hasta + '). Puedes programar tu pedido para mañana.';
   const r = rangoEntrega($('chkFecha').value); if (!r) return '';
@@ -993,6 +1023,7 @@ window.enviarPedido = async () => {
   if (t.length !== 10) return fallo('Ingresa tu número de WhatsApp (10 dígitos).');
   if (!dom) return fallo('Ingresa tu domicilio.');
   if (!col) return fallo('Selecciona o escribe tu colonia.');
+  if (($('chkFecha').value || hoyISO()) < fechaMinimaCarrito()) { aplicarFechaMinima(); return fallo('Por tus artículos sobre pedido, la entrega más pronto es el ' + fechaMinimaCarrito() + '. Elige esa fecha o una posterior.'); }
   const eh = errorHorario(); if (eh) { actualizarHintHorario(); return fallo(eh); }
   const metodo = $('chkMetodo').value, total = subtotalCarrito() + costoEnvio();
   const pagaCon = metodo === 'efectivo' ? Number($('chkPagaCon').value) || null : null;
@@ -1061,7 +1092,7 @@ window.volverAPedir = codigo => {
   const nuevos = [], faltan = [];
   (p.items || []).forEach(it => {
     const v = it.variante_id && buscarVariante(it.variante_id), a = v && articuloDeVariante(it.variante_id);
-    if (v && v.disponible) nuevos.push({ varianteId: v.id, prodId: a.id, nombre: a.nombre, variante: v.nombre || '', precio: v.precio, cantidad: Math.min(99, Math.max(1, Number(it.cantidad) || 1)), img: fotoDe(a) });
+    if (v) nuevos.push({ varianteId: v.id, prodId: a.id, nombre: a.nombre, variante: v.nombre || '', precio: v.precio, cantidad: Math.min(99, Math.max(1, Number(it.cantidad) || 1)), img: fotoDe(a) });
     else faltan.push(it.nombre);
   });
   if (!nuevos.length) { mostrarToast('Esos artículos ya no están disponibles'); return; }
