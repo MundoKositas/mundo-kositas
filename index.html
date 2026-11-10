@@ -693,6 +693,33 @@ async function cargarCatalogo() {
   $('headerSaludo').textContent = (tel ? '📱 ' + tel : 'Invitado') + (cat.lista && cat.lista.especial ? ' · ⭐ Precios especiales' : '');
   mostrarNivel(catSel ? 'lineas' : 'cats');
 }
+// Actualización silenciosa del catálogo (existencias, categorías, artículos ocultos): sin "Cargando…",
+// conserva la vista y el scroll. Se dispara cada minuto, al volver a la app, al abrir carrito/checkout.
+let refrescandoCat = false, ultimoRefrescoCat = 0;
+async function refrescarCatalogo(forzar) {
+  if (refrescandoCat || !cat) return;
+  if (!forzar && Date.now() - ultimoRefrescoCat < 8000) return;
+  refrescandoCat = true;
+  try {
+    const { data, error } = await sb.rpc('cat_catalogo', { p_telefono: tel, p_nip_tokens: nipTokens() });
+    if (error || !data) return;
+    ultimoRefrescoCat = Date.now();
+    cat = data;
+    carrito.forEach(i => { const v = buscarVariante(i.varianteId); if (v) i.precio = v.precio; });
+    if (prodActual) { const n = cat.articulos.find(a => a.id === prodActual.id); if (n) prodActual = n; }
+    const sc = document.querySelector('.app-content'), y = sc ? sc.scrollTop : 0;
+    if ($('buscador').value.trim()) buscarProducto();
+    else if (catSel && cat.categorias.some(c => c.id === catSel)) { if (linSel && !cat.lineas.some(l => l.id === linSel)) linSel = null; renderCategoria(); }
+    else mostrarNivel('cats');
+    if (sc) sc.scrollTop = y;
+    if (typeof actualizarBadgeCarrito === 'function') actualizarBadgeCarrito();
+  } catch (e) { console.warn(e); }
+  finally { refrescandoCat = false; }
+}
+setInterval(() => { if (!document.hidden) refrescarCatalogo(); }, 60000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) refrescarCatalogo(); });
+window.addEventListener('focus', () => refrescarCatalogo());
+window.addEventListener('pageshow', () => refrescarCatalogo());
 // Precios especiales (mayoreo): se desbloquean con el NIP que da la tienda
 function pintarBannerNip() {
   let b = $('bannerNip');
@@ -921,6 +948,7 @@ window.abrirCheckout = () => {
   if (yaCerroHoy() && $('chkFecha').value === hoyISO()) { $('chkFecha').value = mananaISO(); mostrarToast('Ya cerramos entregas de hoy: tu pedido quedó para mañana 📅'); }
   actualizarHintHorario();
   actualizarResumenCheckout(); abrirModal('modalCheckout');
+  refrescarCatalogo(true).then(() => { aplicarFechaMinima(); actualizarResumenCheckout(); });
 };
 // Fecha mínima de entrega = hoy + días del artículo sobre pedido que más tarda
 function aplicarFechaMinima() {
@@ -1136,7 +1164,8 @@ window.mostrarPag = (pag, btn) => {
   $(mapa[pag]).classList.add('active'); (btn || document.querySelectorAll('.nav-btn')[['catalogo', 'carrito', 'misPedidos'].indexOf(pag)]).classList.add('active');
   clearInterval(timerPedidos);
   asegurarSentinel();
-  if (pag === 'carrito') renderCarrito();
+  if (pag === 'carrito') { renderCarrito(); refrescarCatalogo().then(() => { if (pag === 'carrito') renderCarrito(); }); }
+  else if (pag === 'catalogo') refrescarCatalogo();
   if (pag === 'misPedidos') {
     if (!tel || (!tokens().length && !codigosOk().length)) { $('sinSesion').style.display = 'block'; $('conSesion').style.display = 'none'; if (tel) $('verTel').value = tel; }
     else { cargarMisPedidos(); timerPedidos = setInterval(cargarMisPedidos, 30000); }
