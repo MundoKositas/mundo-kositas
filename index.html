@@ -385,7 +385,8 @@ select.form-control{
         <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.6rem;">
           <button onclick="atrasProductos()" style="background:none;border:none;
             font-size:1.1rem;cursor:pointer;">←</button>
-          <div class="section-title" style="margin:0;" id="catSelTitle">Productos</div>
+          <div class="section-title" style="margin:0;flex:1;" id="catSelTitle">Productos</div>
+          <button onclick="compartirVista()" style="background:#f3e8fb;color:var(--rojo);border:none;border-radius:999px;padding:0.35rem 0.8rem;font-weight:800;font-size:0.78rem;cursor:pointer;white-space:nowrap;">🔗 Compartir</button>
         </div>
         <div id="barraLineas" style="display:none;gap:0.6rem;overflow-x:auto;padding:0.2rem 0.1rem 0.7rem;margin-bottom:0.4rem;-webkit-overflow-scrolling:touch;"></div>
         <div class="prods-grid" id="listaProds"></div>
@@ -457,8 +458,10 @@ select.form-control{
           <div class="det-desc"   id="detDesc"></div>
           <div class="det-precio" id="detPrecio"></div>
         </div>
-        <button class="modal-close" onclick="cerrarModal('modalProducto')"
-                style="margin-left:0.75rem;flex-shrink:0;">✕</button>
+        <div style="display:flex;gap:0.4rem;align-items:flex-start;margin-left:0.75rem;flex-shrink:0;">
+          <button onclick="compartirProducto()" title="Compartir este producto" aria-label="Compartir este producto" style="background:#f3e8fb;color:var(--rojo);border:none;border-radius:999px;height:32px;padding:0 0.7rem;font-weight:800;font-size:0.78rem;cursor:pointer;white-space:nowrap;">🔗 Compartir</button>
+          <button class="modal-close" onclick="cerrarModal('modalProducto')">✕</button>
+        </div>
       </div>
       <div id="secVariantes"></div>
       <!-- Selector de cantidad -->
@@ -662,6 +665,7 @@ async function iniciarApp() {
   $('chkFecha').value = hoyISO(); $('chkFecha').min = hoyISO();
   await Promise.all([cargarConfig(), cargarCatalogo()]);
   actualizarBadgeCarrito();
+  aplicarEnlaceDirecto();
   if (tel) cargarMisPedidos();
 }
 
@@ -1186,6 +1190,46 @@ window.addEventListener('DOMContentLoaded', () => {
   if (u) $('telInicio').value = u;
 });
 
+// ---------- Enlaces directos (para promocionar) ----------
+// ?cat=nombre-de-la-categoria   ?linea=nombre-de-la-linea   ?p=ID-del-producto
+// También se aceptan los IDs internos. Los enlaces se generan con los botones «🔗 Compartir».
+const slug = s => norm(s).replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+const baseUrl = () => location.origin + location.pathname;
+function enlaceCategoria(c) { return baseUrl() + '?cat=' + encodeURIComponent(slug(c.nombre)); }
+function enlaceLinea(c, l) { return enlaceCategoria(c) + '&linea=' + encodeURIComponent(slug(l.nombre)); }
+function enlaceProducto(a) { return baseUrl() + '?p=' + encodeURIComponent(a.id); }
+async function compartirEnlace(url, titulo) {
+  try { if (navigator.share) { await navigator.share({ title: titulo, text: titulo + ' · Mundo Kositas', url }); return; } } catch (e) { if (e && e.name === 'AbortError') return; }
+  try { await navigator.clipboard.writeText(url); mostrarToast('Enlace copiado 🔗'); }
+  catch (e) { window.prompt('Copia este enlace:', url); }
+}
+window.compartirVista = () => {
+  const c = cat.categorias.find(x => x.id === catSel); if (!c) return;
+  const l = linSel ? cat.lineas.find(x => x.id === linSel) : null;
+  compartirEnlace(l ? enlaceLinea(c, l) : enlaceCategoria(c), l ? l.nombre : c.nombre);
+};
+window.compartirProducto = () => { if (prodActual) compartirEnlace(enlaceProducto(prodActual), prodActual.nombre); };
+const _qs = new URLSearchParams(location.search);
+const hayEnlaceDirecto = () => !!(_qs.get('p') || _qs.get('cat') || _qs.get('linea'));
+function aplicarEnlaceDirecto() {
+  if (!hayEnlaceDirecto()) return;
+  const pid = _qs.get('p'), qc = _qs.get('cat'), ql = _qs.get('linea');
+  const buscarPor = (arr, q) => { const k = slug(q); return arr.find(x => x.id === q || slug(x.nombre) === k); };
+  try {
+    let a = null, l = null, c = null;
+    if (pid) { a = cat.articulos.find(x => x.id === pid); if (a) l = cat.lineas.find(x => x.id === a.linea_id); }
+    if (!l && ql) l = buscarPor(cat.lineas, ql);
+    if (l) c = cat.categorias.find(x => x.id === l.categoria_id);
+    if (!c && qc) c = buscarPor(cat.categorias, qc);
+    if (c) { catSel = c.id; linSel = l ? l.id : null; mostrarNivel('lineas'); asegurarSentinel(); }
+    if (a) { window.abrirProducto(a.id); }
+    else if (pid) mostrarToast('Ese producto ya no está disponible');
+    else if (!c) mostrarToast('Esa sección ya no está disponible');
+  } catch (e) { console.warn(e); }
+  // se limpia la dirección para que al recargar o compartir no se repita la apertura
+  try { history.replaceState({ mk: 0 }, '', baseUrl() + (tel ? '?tel=' + tel : '')); } catch (e) {}
+}
+
 // ---------- Botón/gesto "atrás" del celular ----------
 // Mientras el cliente está dentro de un nivel (línea, buscador, carrito, ventana abierta) se deja una entrada
 // extra en el historial; al regresar con el gesto se sube un nivel en vez de salir de la página.
@@ -1194,6 +1238,8 @@ function estaProfundo() {
 }
 function asegurarSentinel() { if (estaProfundo() && !(history.state && history.state.mk === 1)) history.pushState({ mk: 1 }, ''); }
 history.replaceState({ mk: 0 }, '');
+// Quien llega desde un enlace de promoción entra directo, sin pedirle el teléfono antes (usa el guardado, si hay).
+if (hayEnlaceDirecto()) { const t0 = (_qs.get('tel') || lsGet('mk_tel') || '').replace(/\D/g, ''); tel = t0.length === 10 ? t0 : null; iniciarApp(); }
 window.addEventListener('popstate', () => {
   const abiertos = [...document.querySelectorAll('.modal-overlay.open')];
   if (abiertos.length) abiertos[abiertos.length - 1].classList.remove('open');
