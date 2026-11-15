@@ -781,7 +781,7 @@ function buscarVariante(id) {
 function articuloDeVariante(id) { return cat.articulos.find(a => a.variantes.some(v => v.id === id)); }
 
 // ---------- Navegación categorías → líneas → artículos ----------
-function fotoDe(a) { return a && a.imagenes && a.imagenes[0] || null; }
+function fotoDe(a) { return a && ((a.imagenes && a.imagenes[0]) || ((a.variantes || []).find(v => v.imagen) || {}).imagen) || null; }
 function fotoDeCategoria(catId) {
   const cp = cat.categorias.find(c => c.id === catId);
   if (cp && cp.imagen) return cp.imagen;
@@ -889,9 +889,15 @@ window.abrirProducto = id => {
   cantModal = 1; imgIdx = 0;
   pintarDetalle(); abrirModal('modalProducto');
 };
+// Fotos del detalle: primero la del modelo/color elegido (si tiene), luego las generales del artículo.
+function imgsActuales() {
+  const a = prodActual; if (!a) return [];
+  const v = a.variantes[varIdx];
+  return (v && v.imagen ? [v.imagen] : []).concat((a.imagenes || []).filter(u => !v || u !== v.imagen));
+}
 function pintarDetalle() {
   const a = prodActual, v = a.variantes[varIdx];
-  const imgs = a.imagenes || [];
+  const imgs = imgsActuales();
   const flecha = (lado, d) => `<button type="button" onclick="moverImg(${d})" aria-label="${d < 0 ? 'Anterior' : 'Siguiente'}" style="position:absolute;top:50%;${lado}:6px;transform:translateY(-50%);width:36px;height:36px;border-radius:50%;border:none;background:rgba(0,0,0,0.45);color:#fff;font-size:1.3rem;font-weight:900;line-height:1;cursor:pointer;z-index:2;">${d < 0 ? '‹' : '›'}</button>`;
   let html = `<div class="det-img" style="position:relative;" id="detImgBox">${imgs.length ? `<img src="${esc(imgs[imgIdx])}">` : '📦'}${imgs.length > 1 ? flecha('left', -1) + flecha('right', 1) + `<div style="position:absolute;bottom:6px;right:8px;background:rgba(0,0,0,0.5);color:#fff;font-size:0.7rem;font-weight:700;border-radius:10px;padding:1px 8px;">${imgIdx + 1} / ${imgs.length}</div>` : ''}</div>`;
   if (imgs.length > 1) {
@@ -905,7 +911,7 @@ function pintarDetalle() {
   const hayVars = a.variantes.length > 1 || a.variantes[0].nombre;
   $('secVariantes').innerHTML = hayVars
     ? '<span class="variantes-label">Elige tu opción:</span><div class="variantes-row">' +
-      a.variantes.map((x, i) => `<button class="var-chip ${i === varIdx ? 'active' : ''}" ${x.disponible ? '' : 'style="opacity:.8;border-style:dashed;"'} onclick="seleccionarVar(${i})">${esc(x.nombre || 'Único')}${x.disponible ? '' : ' (sobre pedido)'}</button>`).join('') + '</div>'
+      a.variantes.map((x, i) => `<button class="var-chip ${i === varIdx ? 'active' : ''}" ${x.disponible ? '' : 'style="opacity:.8;border-style:dashed;"'} onclick="seleccionarVar(${i})">${x.imagen ? `<img src="${esc(x.imagen)}" alt="" style="width:26px;height:26px;border-radius:5px;object-fit:cover;vertical-align:middle;margin-right:6px;">` : ''}${esc(x.nombre || 'Único')}${x.disponible ? '' : ' (sobre pedido)'}</button>`).join('') + '</div>'
     : '';
   $('cantModal').textContent = cantModal;
   $('subtotalModal').textContent = money(v.precio * cantModal);
@@ -917,19 +923,19 @@ function pintarDetalle() {
   av.textContent = '📦 Sobre pedido: este artículo no está en existencia ahora. Te lo entregamos en ' + textoDias(diasPedidoDe(a)) + '.';
 }
 window.verImg = i => { imgIdx = i; pintarDetalle(); };
-window.moverImg = d => { const n = (prodActual && prodActual.imagenes || []).length; if (n < 2) return; imgIdx = (imgIdx + d + n) % n; pintarDetalle(); };
+window.moverImg = d => { const n = imgsActuales().length; if (n < 2) return; imgIdx = (imgIdx + d + n) % n; pintarDetalle(); };
 // deslizar con el dedo (como en redes): izquierda = siguiente, derecha = anterior
 (function () { let x0 = null; const box = () => document.getElementById('modalProdImg');
   document.addEventListener('touchstart', e => { x0 = box() && box().contains(e.target) ? e.touches[0].clientX : null; }, { passive: true });
   document.addEventListener('touchend', e => { if (x0 === null) return; const dx = e.changedTouches[0].clientX - x0; x0 = null; if (Math.abs(dx) > 40) window.moverImg(dx < 0 ? 1 : -1); }, { passive: true }); })();
 document.addEventListener('keydown', e => { if (prodActual && document.getElementById('modalProducto') && document.getElementById('modalProducto').classList.contains('open')) { if (e.key === 'ArrowLeft') window.moverImg(-1); if (e.key === 'ArrowRight') window.moverImg(1); } });
-window.seleccionarVar = i => { varIdx = i; pintarDetalle(); };
+window.seleccionarVar = i => { varIdx = i; imgIdx = 0; pintarDetalle(); };
 window.cambiarCantModal = d => { cantModal = Math.min(99, Math.max(1, cantModal + d)); pintarDetalle(); };
 window.agregarAlCarrito = () => {
   const a = prodActual, v = a.variantes[varIdx];
   const ex = carrito.find(i => i.varianteId === v.id);
   if (ex) ex.cantidad = Math.min(99, ex.cantidad + cantModal);
-  else carrito.push({ varianteId: v.id, prodId: a.id, nombre: a.nombre, variante: v.nombre || '', precio: v.precio, cantidad: cantModal, img: fotoDe(a) });
+  else carrito.push({ varianteId: v.id, prodId: a.id, nombre: a.nombre, variante: v.nombre || '', precio: v.precio, cantidad: cantModal, img: v.imagen || fotoDe(a) });
   guardarCarrito(); cerrarModal('modalProducto'); mostrarToast('Agregado al carrito 🛒' + (v.disponible ? '' : ' · sobre pedido'));
 };
 
