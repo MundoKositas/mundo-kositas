@@ -616,6 +616,34 @@ const SUPABASE_URL = "https://vsfzkktmdwqkfbecmfcj.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZzZnpra3RtZHdxa2ZiZWNtZmNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgxMzAwMTgsImV4cCI6MjEwMzcwNjAxOH0.q6unj5y4p2alR3YgcEZ9N3_UTXLQd_TC9Zfxm6WfDzs";
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
 
+// ---------- Marca por empresa (según la dirección desde la que se abre el catálogo) ----------
+// Mundo Kositas conserva su diseño original (imágenes y textos incluidos en este archivo).
+const EMPRESA_ORIGINAL = '96f14cb8-3068-4f66-a13e-30561c9068c3';
+(async function aplicarMarca(){
+  try{
+    const { data } = await sb.rpc('resolver_empresa', { p_host: location.hostname });
+    if(!data || !data.empresa_id) return;
+    const c = data.colores_catalogo || {};
+    const esOriginal = data.empresa_id === EMPRESA_ORIGINAL;
+    const r = document.documentElement.style;
+    const boton = c.boton || c.barra;
+    if(!esOriginal){
+      if(boton){ r.setProperty('--rojo', boton); r.setProperty('--naranja', boton); }
+      if(c.acento){ r.setProperty('--rojo-dark', c.acento); }
+      if(boton){ r.setProperty('--rojo-light', 'color-mix(in srgb, ' + boton + ' 14%, white)'); r.setProperty('--amarillo', 'color-mix(in srgb, ' + boton + ' 45%, white)'); }
+      if(c.fondo) r.setProperty('--bg', c.fondo);
+      document.title = (data.nombre || '') + ' — Catálogo';
+      const meta = document.querySelector('meta[name="apple-mobile-web-app-title"]'); if(meta) meta.content = data.nombre || '';
+      const tag = document.querySelector('.inicio-logo p'); if(tag) tag.textContent = '';
+      document.querySelectorAll('.inicio-logo img, .app-header img').forEach(im=>{
+        if(data.logo_url){ im.src = data.logo_url; im.alt = data.nombre || ''; }
+        else { const t = document.createElement('span'); t.className = 'header-logo'; t.textContent = data.nombre || ''; t.style.fontSize = '1.2rem'; im.replaceWith(t); }
+      });
+    }
+  }catch(e){ /* sin marca: se queda el diseño de siempre */ }
+})();
+
+
 // ---------- Estado ----------
 let tel = null, cfg = {}, cat = { categorias: [], lineas: [], articulos: [], lista: {} };
 let carrito = [], prodActual = null, varIdx = 0, cantModal = 1, imgIdx = 0;
