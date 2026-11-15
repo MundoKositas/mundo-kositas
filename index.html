@@ -622,7 +622,12 @@ const EMPRESA_ORIGINAL = '96f14cb8-3068-4f66-a13e-30561c9068c3';
 (async function aplicarMarca(){
   try{
     const { data } = await sb.rpc('resolver_empresa', { p_host: location.hostname });
-    if(!data || !data.empresa_id) return;
+    if(!data || !data.empresa_id){
+      if(/\.desdecasa\.mx$/i.test(location.hostname)){
+        document.body.innerHTML = '<div style="font-family:system-ui,sans-serif;text-align:center;padding:4rem 1.5rem;color:#444;"><h1 style="font-size:1.4rem;margin:0 0 .6rem;">Tienda no encontrada</h1><p>Esta dirección no corresponde a ninguna tienda activa. Revisa el enlace que te compartieron.</p></div>';
+      }
+      return;
+    }
     const c = data.colores_catalogo || {};
     const esOriginal = data.empresa_id === EMPRESA_ORIGINAL;
     const r = document.documentElement.style;
