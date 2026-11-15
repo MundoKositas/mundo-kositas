@@ -12,7 +12,7 @@
 5. Desactiva Google Analytics (no es necesario)
 6. Clic en "Crear proyecto"
 7. Espera que se cree (1 minuto aprox.)
-
+======================================================
 
 =======================================================
 ## PASO 2 — Activar Authentication (Login)
