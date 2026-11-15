@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<script>if(/^(www\.)?(ofertienda|desdecasa)\.mx$/i.test(location.hostname)){location.replace('/plataforma.html');}</script>
+<script>(function(){var h=location.hostname;if(/^(www\.)?(ofertienda|desdecasa)\.mx$/i.test(h)){location.replace('/plataforma.html');return;}if(/\.(ofertienda|desdecasa)\.mx$/i.test(h)){var s=document.createElement('style');s.id='ocultar-marca';s.textContent='body{visibility:hidden}';document.head.appendChild(s);setTimeout(function(){var o=document.getElementById('ocultar-marca');if(o)o.remove();},5000);}})();</script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="theme-color" content="#8E24AA">
@@ -24,7 +24,6 @@
   --font:'Nunito',sans-serif;
   --header-h:58px; --nav-h:62px;
 }
-  
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
 html,body{height:100%;}
 body{font-family:var(--font);background:var(--bg);color:var(--gris-dark);
@@ -622,14 +621,12 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth:
 // Mundo Kositas conserva su diseño original (imágenes y textos incluidos en este archivo).
 const EMPRESA_ORIGINAL = '96f14cb8-3068-4f66-a13e-30561c9068c3';
 (async function aplicarMarca(){
+  const mostrar = () => { const o = document.getElementById('ocultar-marca'); if(o) o.remove(); };
   try{
     const { data } = await sb.rpc('resolver_empresa', { p_host: location.hostname });
     if(!data || !data.empresa_id){
-      if(/\.desdecasa\.mx$/i.test(location.hostname)){
-        document.title = 'Tienda no disponible';
-        document.body.innerHTML = '<div style="font-family:system-ui,sans-serif;text-align:center;padding:4rem 1.5rem;color:#444;max-width:440px;margin:0 auto;"><div style="font-size:3rem;margin-bottom:.5rem;">🛍️</div><h1 style="font-size:1.35rem;margin:0 0 .6rem;">No encontramos esta tienda</h1><p style="line-height:1.5;margin:0;">Revisa que el enlace esté completo y bien escrito. Si lo recibiste de un negocio, pídele que te lo envíe de nuevo.</p></div>';
-      }
-      return;
+      if(/\.desdecasa\.mx$/i.test(location.hostname)){ location.replace('/plataforma.html?noencontrada=1'); return; }
+      mostrar(); return;
     }
     const c = data.colores_catalogo || {};
     const esOriginal = data.empresa_id === EMPRESA_ORIGINAL;
@@ -648,7 +645,8 @@ const EMPRESA_ORIGINAL = '96f14cb8-3068-4f66-a13e-30561c9068c3';
         else { const t = document.createElement('span'); t.className = 'header-logo'; t.textContent = data.nombre || ''; t.style.fontSize = '1.2rem'; im.replaceWith(t); }
       });
     }
-  }catch(e){ /* sin marca: se queda el diseño de siempre */ }
+    mostrar();
+  }catch(e){ mostrar(); /* sin marca: se queda el diseño de siempre */ }
 })();
 
 
