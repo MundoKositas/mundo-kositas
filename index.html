@@ -330,6 +330,9 @@ select.form-control{
       <div style="font-size:0.75rem;color:var(--gris);margin-top:0.35rem;font-weight:600;">
         Para rastrear tus pedidos y enviarte confirmaciones
       </div>
+      <div style="font-size:0.75rem;color:var(--gris);margin-top:0.35rem;">
+        Usamos tus datos solo para entregar tu pedido. Consulta el <a href="aviso-privacidad.html?t=Mundo%20Kositas" target="_blank" rel="noopener" style="color:inherit;font-weight:700;">aviso de privacidad</a>.
+      </div>
     </div>
     <button class="btn btn-rojo" onclick="entrarCatalogo()" style="margin-bottom:0.75rem;">
       Ver catálogo 🛍️
@@ -337,6 +340,7 @@ select.form-control{
     <button class="btn btn-gris" onclick="entrarSinRegistro()" style="font-size:0.85rem;">
       Continuar sin registrarme
     </button>
+    <p style="text-align:center;font-size:0.72rem;color:var(--gris);margin:0.9rem 0 0;">D.R. © <span id="anioPie">2026</span> Mundo Kositas</p>
   </div>
 </div>
 
@@ -630,6 +634,12 @@ const EMPRESA_ORIGINAL = '96f14cb8-3068-4f66-a13e-30561c9068c3';
     }
     const c = data.colores_catalogo || {};
     const esOriginal = data.empresa_id === EMPRESA_ORIGINAL;
+    try{
+      const nom = data.nombre || 'Mundo Kositas';
+      document.querySelectorAll('a[href^="aviso-privacidad.html"]').forEach(l => l.href = 'aviso-privacidad.html?t=' + encodeURIComponent(nom));
+      const ap = document.getElementById('anioPie'); if(ap && ap.parentNode) ap.parentNode.firstChild.textContent = 'D.R. © ';
+      document.querySelectorAll('#anioPie').forEach(e => { if(e.parentNode) e.parentNode.lastChild.textContent = ' ' + nom; });
+    }catch(e){}
     const r = document.documentElement.style;
     const boton = c.boton || c.barra;
     if(!esOriginal){
@@ -1294,6 +1304,7 @@ $('buscador').addEventListener('input', asegurarSentinel);
 
 </script>
 <script>
+try{document.getElementById('anioPie').textContent=new Date().getFullYear();}catch(e){}
 if('serviceWorker' in navigator) {
   window.addEventListener('load', ()=>
     navigator.serviceWorker.register('sw.js').catch(()=>{}));
