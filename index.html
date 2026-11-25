@@ -819,7 +819,7 @@ function fotoDeCategoria(catId) {
 }
 function fotoDeLinea(linId) { const lp = cat.lineas.find(l => l.id === linId); if (lp && lp.imagen) return lp.imagen; const a = cat.articulos.find(x => x.linea_id === linId && fotoDe(x)); return a ? fotoDe(a) : null; }
 function tarjeta(id, nombre, foto, onclick) {
-  const img = foto ? `<img src="${esc(foto)}" loading="lazy" style="width:100%;height:100%;object-fit:cover;">` : phSinFoto('width:62%;height:62%;object-fit:contain;padding:0;', 'font-size:2rem;');
+  const img = foto ? `<img src="${esc(foto)}" loading="lazy" style="width:100%;height:100%;object-fit:cover;">` : phSinFoto('width:50%;height:50%;object-fit:contain;padding:0;opacity:.5;', 'font-size:2rem;');
   return `<div class="cat-card" onclick="${onclick}" style="padding:0;overflow:hidden;display:flex;flex-direction:column;">
     <div style="width:100%;aspect-ratio:1/1;max-height:160px;background:#f8f8f8;display:flex;align-items:center;justify-content:center;overflow:hidden;border-radius:12px 12px 0 0;">${img}</div>
     <div style="background:var(--rojo);border-radius:0 0 12px 12px;padding:0.4rem 0.3rem;text-align:center;min-height:2.2rem;display:flex;align-items:center;justify-content:center;">
@@ -898,7 +898,7 @@ function renderProductos(arr, contId) {
     const disp = a.variantes.some(v => v.disponible);
     const nVars = a.variantes.filter(v => v.nombre).length;
     return `<div class="prod-card" onclick="abrirProducto('${a.id}')">
-      <div class="prod-img">${foto ? `<img src="${esc(foto)}" loading="lazy">` : phSinFoto('width:68%;height:68%;object-fit:contain;padding:0;')}${disp ? '' : `<div class="badge-pedido">📦 Sobre pedido · entrega en ${textoDias(diasPedidoDe(a))}</div>`}</div>
+      <div class="prod-img">${foto ? `<img src="${esc(foto)}" loading="lazy">` : phSinFoto('width:46%;height:46%;object-fit:contain;padding:0;opacity:.45;')}${disp ? '' : `<div class="badge-pedido">📦 Sobre pedido · entrega en ${textoDias(diasPedidoDe(a))}</div>`}</div>
       <div class="prod-body"><div class="prod-nombre">${esc(a.nombre)}</div>
         ${nVars > 1 ? `<div class="prod-variantes">${nVars} opciones</div>` : ''}${estrellasHtml(a.id)}
         <div class="prod-precio">${rangoPrecio(a)}</div>
@@ -923,7 +923,7 @@ function pintarDetalle() {
   const a = prodActual, v = a.variantes[varIdx];
   const imgs = imgsActuales();
   const flecha = (lado, d) => `<button type="button" onclick="moverImg(${d})" aria-label="${d < 0 ? 'Anterior' : 'Siguiente'}" style="position:absolute;top:50%;${lado}:6px;transform:translateY(-50%);width:36px;height:36px;border-radius:50%;border:none;background:rgba(0,0,0,0.45);color:#fff;font-size:1.3rem;font-weight:900;line-height:1;cursor:pointer;z-index:2;">${d < 0 ? '‹' : '›'}</button>`;
-  let html = `<div class="det-img" style="position:relative;" id="detImgBox">${imgs.length ? `<img src="${esc(imgs[imgIdx])}">` : phSinFoto('width:52%;height:auto;max-height:200px;margin:14px auto;padding:0;display:block;')}${imgs.length > 1 ? flecha('left', -1) + flecha('right', 1) + `<div style="position:absolute;bottom:6px;right:8px;background:rgba(0,0,0,0.5);color:#fff;font-size:0.7rem;font-weight:700;border-radius:10px;padding:1px 8px;">${imgIdx + 1} / ${imgs.length}</div>` : ''}</div>`;
+  let html = `<div class="det-img" style="position:relative;" id="detImgBox">${imgs.length ? `<img src="${esc(imgs[imgIdx])}">` : phSinFoto('width:40%;height:auto;max-height:160px;margin:18px auto;padding:0;display:block;opacity:.5;')}${imgs.length > 1 ? flecha('left', -1) + flecha('right', 1) + `<div style="position:absolute;bottom:6px;right:8px;background:rgba(0,0,0,0.5);color:#fff;font-size:0.7rem;font-weight:700;border-radius:10px;padding:1px 8px;">${imgIdx + 1} / ${imgs.length}</div>` : ''}</div>`;
   if (imgs.length > 1) {
     html += `<div style="display:flex;gap:0.4rem;padding:0.5rem 1.25rem 0;overflow-x:auto;">` +
       imgs.map((u, i) => `<img src="${esc(u)}" onclick="verImg(${i})" class="var-chip-img ${i === imgIdx ? 'active' : ''}">`).join('') + '</div>';
