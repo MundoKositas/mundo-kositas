@@ -626,6 +626,23 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth:
 const EMPRESA_ORIGINAL = '96f14cb8-3068-4f66-a13e-30561c9068c3';
 // Imagen que se muestra en lugar de la cajita cuando un producto no tiene foto (se configura en Admin > Empresa)
 var LOGO_SIN = '';
+// ---------- Píxel de Meta (opcional por empresa) ----------
+var PIXEL_ON = false;
+function iniciarPixel(id){
+  try{
+    if(!id || !/^[0-9]{8,20}$/.test(String(id)) || PIXEL_ON) return;
+    !function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');
+    fbq('init', String(id)); fbq('track', 'PageView'); PIXEL_ON = true;
+    if(window._pixelCola){ window._pixelCola.forEach(function(x){ fbq('track', x[0], x[1]); }); window._pixelCola = []; }
+  }catch(e){}
+}
+// Los ids de contenido son los mismos del archivo del catálogo de Facebook (id = variante)
+function pixelEvento(nombre, datos){
+  try{
+    if(PIXEL_ON && window.fbq) fbq('track', nombre, datos);
+    else { (window._pixelCola = window._pixelCola || []).push([nombre, datos]); }
+  }catch(e){}
+}
 function phSinFoto(imgStyle, emoStyle){
   const e = emoStyle ? `<span style="${emoStyle}">📦</span>` : '📦';
   const inner = LOGO_SIN ? `<img src="${esc(LOGO_SIN)}" alt="" style="${imgStyle}">` : e;
@@ -646,6 +663,7 @@ function refrescarPh(){
       mostrar(); return;
     }
     LOGO_SIN = data.logo_sin_imagen_url || data.logo_url || ''; try{ refrescarPh(); }catch(e){}
+    iniciarPixel(data.meta_pixel_id);
     const c = data.colores_catalogo || {};
     const esOriginal = data.empresa_id === EMPRESA_ORIGINAL;
     try{
@@ -912,6 +930,7 @@ window.abrirProducto = id => {
   varIdx = Math.max(0, prodActual.variantes.findIndex(v => v.disponible));
   cantModal = 1; imgIdx = 0;
   pintarDetalle(); abrirModal('modalProducto');
+  try{ const v0 = prodActual.variantes[varIdx]; pixelEvento('ViewContent', { content_type:'product', content_ids:[v0.id], content_name: prodActual.nombre, value: Number(v0.precio)||0, currency:'MXN' }); }catch(e){}
 };
 // Fotos del detalle: primero la del modelo/color elegido (si tiene), luego las generales del artículo.
 function imgsActuales() {
@@ -960,6 +979,7 @@ window.agregarAlCarrito = () => {
   const ex = carrito.find(i => i.varianteId === v.id);
   if (ex) ex.cantidad = Math.min(99, ex.cantidad + cantModal);
   else carrito.push({ varianteId: v.id, prodId: a.id, nombre: a.nombre, variante: v.nombre || '', precio: v.precio, cantidad: cantModal, img: v.imagen || fotoDe(a) });
+  pixelEvento('AddToCart', { content_type:'product', content_ids:[v.id], content_name: a.nombre, value: (Number(v.precio)||0) * cantModal, currency:'MXN' });
   guardarCarrito(); cerrarModal('modalProducto'); mostrarToast('Agregado al carrito 🛒' + (v.disponible ? '' : ' · sobre pedido'));
 };
 
@@ -1133,6 +1153,7 @@ window.enviarPedido = async () => {
       fecha_entrega: $('chkFecha').value || null, hora_desde: $('chkHoraDesde').value || null, hora_hasta: $('chkHoraHasta').value || null,
       notas: $('chkNotas').value.trim(), nip_tokens: nipTokens(), items: carrito.map(i => ({ variante_id: i.varianteId, cantidad: i.cantidad })) } });
     if (error) throw error;
+    pixelEvento('Purchase', { content_type:'product', content_ids: carrito.map(i=>i.varianteId), num_items: carrito.reduce((n,i)=>n+i.cantidad,0), value: Number(data.total)||total, currency:'MXN' });
     tel = t; lsSet('mk_tel', tel); if (data.token) agregarLista('mk_tokens', data.token); $('headerSaludo').textContent = '📱 ' + tel;
     const resumen = (data.items || []).map(i => `${i.cantidad} x ${i.nombre}`).join('\n');
     const msg = `Hola, acabo de hacer el pedido ${data.codigo} en el catálogo 🛍️\n${resumen}\nTotal: ${money(data.total)} (envío ${money(data.costo_envio)})\nPago: ${metodo === 'efectivo' ? 'efectivo' : 'transferencia'}\nMi nombre: ${nombre}`;
